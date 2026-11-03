@@ -135,12 +135,12 @@ docker compose exec worker python -m apps.worker.background_jobs --once
 > 要从别的服务接入？先读 `docs/API_INTEGRATION.md`：它给出调用顺序（先调哪个后调哪个、为什么）、如何拿 API key、每条 run 都要走的审核循环，以及轮询之外的 webhook 方案。本节只是最短路径，那份文档才是通往生产的路径。
 
 ```bash
-# 1. 建项目
+### 1. 建项目
 curl -X POST http://localhost:8080/api/projects \
   -H "Content-Type: application/json" \
   -d '{"title":"秋天奶茶广告"}'
 
-# 2. 在项目下建 run
+### 2. 在项目下建 run
 curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
   -H "Content-Type: application/json" \
   -d '{
@@ -152,19 +152,19 @@ curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
     "target_duration_seconds":15
   }'
 
-# 3. 预检 → 生成可审计执行计划 → 启动
+### 3. 预检 → 生成可审计执行计划 → 启动
 curl -X POST http://localhost:8080/api/runs/<run_id>/preflight
 curl -X POST http://localhost:8080/api/runs/<run_id>/execution-plan
 curl -X POST http://localhost:8080/api/runs/<run_id>/start
 
-# 4. 审核循环：run 停在 waiting_review 时，找到打开的关口并批准
+### 4. 审核循环：run 停在 waiting_review 时，找到打开的关口并批准
 curl "http://localhost:8080/api/runs/<run_id>/review-requests?status=open"
 
 curl -X POST http://localhost:8080/api/review-requests/<request_id>/decisions \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 
-# 或一键过当前阶段（等价，基于同一审核内核）
+### 或一键过当前阶段（等价，基于同一审核内核）
 curl -X POST http://localhost:8080/api/runs/<run_id>/stages/<stage_key>/review \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
@@ -275,19 +275,19 @@ DASHSCOPE_LLM_MODEL=qwen-plus
 ## 部署与运维
 
 ```bash
-# 生产栈：基础设施端口不发布，迁移作为一次性 migrate 服务，四角色 Worker
+### 生产栈：基础设施端口不发布，迁移作为一次性 migrate 服务，四角色 Worker
 docker compose -f docker-compose.prod.yml up -d --build
 
-# 升级前预检（读数据库与配置本身，exit 0/1/2，支持 --json）
+### 升级前预检（读数据库与配置本身，exit 0/1/2，支持 --json）
 python scripts/deployment_preflight.py
 
-# 部署后冒烟：纯 HTTP 走一遍审核内核与全部版本化能力面（默认 390 项检查）
+### 部署后冒烟：纯 HTTP 走一遍审核内核与全部版本化能力面（默认 390 项检查）
 docker compose exec -T api python scripts/verify_review_loop.py
 
-# 部署姿态自报：版本、迁移位点、能力开关、表数、维护开关
+### 部署姿态自报：版本、迁移位点、能力开关、表数、维护开关
 curl http://localhost:18080/api/deployment
 
-# 维护模式：挂写不挂读
+### 维护模式：挂写不挂读
 curl -X POST localhost:18080/api/deployment/maintenance \
   -H 'Content-Type: application/json' -d '{"enabled": true}'
 ```

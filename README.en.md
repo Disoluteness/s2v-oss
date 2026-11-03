@@ -138,12 +138,12 @@ docker compose exec worker python -m apps.worker.background_jobs --once
 > Integrating from another service? Read `docs/API_INTEGRATION.md` first: it gives the calling order (which endpoint before which, and why), how to get an API key, the review-gate loop every run passes through, and the webhook alternative to polling. This section is the shortest path to *something*; that document is the path to *production*.
 
 ```bash
-# 1. Create a project
+### 1. Create a project
 curl -X POST http://localhost:8080/api/projects \
   -H "Content-Type: application/json" \
   -d '{"title":"Autumn milk tea ad"}'
 
-# 2. Create a run under the project
+### 2. Create a run under the project
 curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
   -H "Content-Type: application/json" \
   -d '{
@@ -155,19 +155,19 @@ curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
     "target_duration_seconds":15
   }'
 
-# 3. Preflight → auditable execution plan → start
+### 3. Preflight → auditable execution plan → start
 curl -X POST http://localhost:8080/api/runs/<run_id>/preflight
 curl -X POST http://localhost:8080/api/runs/<run_id>/execution-plan
 curl -X POST http://localhost:8080/api/runs/<run_id>/start
 
-# 4. Review loop: when the run parks in waiting_review, find the open gate and approve it
+### 4. Review loop: when the run parks in waiting_review, find the open gate and approve it
 curl "http://localhost:8080/api/runs/<run_id>/review-requests?status=open"
 
 curl -X POST http://localhost:8080/api/review-requests/<request_id>/decisions \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 
-# Or one-click stage review (equivalent, backed by the same review kernel)
+### Or one-click stage review (equivalent, backed by the same review kernel)
 curl -X POST http://localhost:8080/api/runs/<run_id>/stages/<stage_key>/review \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
@@ -278,22 +278,22 @@ Provider keys come from three sources: `.env` variables, database-managed provid
 ## Deployment and Operations
 
 ```bash
-# Production stack: infrastructure ports unpublished, migrations as a one-shot
+### Production stack: infrastructure ports unpublished, migrations as a one-shot
 # migrate service, four role-scoped workers
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Pre-upgrade preflight (reads the database and configuration itself; exit 0/1/2, --json available)
+### Pre-upgrade preflight (reads the database and configuration itself; exit 0/1/2, --json available)
 python scripts/deployment_preflight.py
 
-# Post-deploy smoke: pure-HTTP walk of the review kernel and every versioned
+### Post-deploy smoke: pure-HTTP walk of the review kernel and every versioned
 # capability surface (390 checks by default)
 docker compose exec -T api python scripts/verify_review_loop.py
 
-# Deployment posture self-report: version, migration head, capability switches,
+### Deployment posture self-report: version, migration head, capability switches,
 # table count, maintenance switch
 curl http://localhost:18080/api/deployment
 
-# Maintenance mode: writes suspended, reads keep answering
+### Maintenance mode: writes suspended, reads keep answering
 curl -X POST localhost:18080/api/deployment/maintenance \
   -H 'Content-Type: application/json' -d '{"enabled": true}'
 ```

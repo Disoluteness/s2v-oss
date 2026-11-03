@@ -38,3 +38,7 @@ push.sh
 
 # 个人推送脚本（含两个远程的个人配置，不入开源仓）
 push.sh
+
+# 沙箱写副本复发覆盖：md / html 同款 6 位随机后缀
+*.md[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]
+*.html[a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9][a-zA-Z0-9]
