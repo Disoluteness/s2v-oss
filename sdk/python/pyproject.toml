@@ -1,0 +1,18 @@
+[project]
+name = "s2v-client"
+version = "0.8.0"
+description = "Python client for the Script2Video Studio HTTP API"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = []
+
+[project.scripts]
+s2v = "s2v.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["s2v"]

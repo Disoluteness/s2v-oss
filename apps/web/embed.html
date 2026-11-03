@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio 嵌入会话</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button {
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0 12px;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--blue);
+        color: var(--blue);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      button.primary:hover:not(:disabled) {
+        background: #1d4ed8;
+        color: #fff;
+      }
+
+      button.danger {
+        border-color: var(--red);
+        color: var(--red);
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 60px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        font: inherit;
+        resize: vertical;
+      }
+
+      /* The embed bar is the whole reason a screenshot of this page is
+         unambiguous: it says out loud that this is a delegated, expiring view,
+         not the full workspace. */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 16px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand,
+      .meta,
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .brand strong {
+        font-size: 15px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .pill.info {
+        background: var(--blue-soft);
+        border-color: #c7dbff;
+        color: var(--blue);
+      }
+
+      .pill.ok {
+        background: var(--green-soft);
+        border-color: #bfe8cd;
+        color: var(--green);
+      }
+
+      .pill.warn {
+        background: var(--amber-soft);
+        border-color: #f0d9a8;
+        color: var(--amber);
+      }
+
+      .pill.bad {
+        background: var(--red-soft);
+        border-color: #f2c4c4;
+        color: var(--red);
+      }
+
+      .pill.mute {
+        background: var(--panel-soft);
+      }
+
+      main {
+        display: grid;
+        gap: 12px;
+        padding: 12px 16px 24px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+      }
+
+      .board-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .board-head h2 {
+        margin: 0 0 4px;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 6px 0;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .status-line {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status-line.error {
+        color: var(--red);
+      }
+
+      .status-line.warn {
+        color: var(--amber);
+      }
+
+      .alert {
+        border-color: #f0d9a8;
+        background: var(--amber-soft);
+      }
+
+      .alert h2 {
+        color: var(--amber);
+      }
+
+      /* Stage lanes stay a vertical list: an embedded frame is usually narrow,
+         and a horizontal board would need its own scrollbars to read. */
+      .lanes {
+        display: grid;
+        gap: 8px;
+      }
+
+      .lane {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel-soft);
+        padding: 8px 10px;
+      }
+
+      .lane.current {
+        border-left-color: var(--blue);
+      }
+
+      .lane.waiting {
+        border-left-color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .lane.failed {
+        border-left-color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .lane-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .run-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .run-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        height: auto;
+        padding: 8px 10px;
+        text-align: left;
+      }
+
+      .run-card .run-title {
+        font-weight: 600;
+      }
+
+      .review-snapshot {
+        display: grid;
+        gap: 4px;
+        margin: 8px 0;
+      }
+
+      .focus-list {
+        margin: 4px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .artifact-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+        border-bottom: 1px dashed var(--border);
+      }
+
+      .artifact-row:last-child {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      The embed shell (V7.4).
+
+      One file serves both embed pages — bare and run-pinned — because which view
+      to draw is the page's own business. What is *not* the page's business is
+      whether it may be framed at all: that is decided by the server, which emits
+      ``Content-Security-Policy: frame-ancestors ...`` from the integration row
+      named in this URL's path. The token never reaches the server on that first
+      document request, which is exactly why the integration id is in the path.
+
+      Everything below treats the token as the only source of truth about context
+      and scopes. A pasted URL cannot widen either: the server re-checks both on
+      every call, so the page's job is to render honestly, not to enforce.
+    -->
+    <header class="topbar">
+      <div class="brand">
+        <strong id="integrationName">嵌入会话</strong>
+        <span class="pill" id="sessionBadge">正在建立会话…</span>
+      </div>
+      <div class="meta">
+        <span class="pill" id="actorBadge">—</span>
+        <span class="pill" id="scopeBadge">—</span>
+        <span class="pill info" id="contextBadge">—</span>
+        <button type="button" id="refreshButton">刷新</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel alert hidden" id="alertPanel">
+        <h2 id="alertTitle">—</h2>
+        <div class="muted" id="alertBody"></div>
+        <div class="action-row" style="margin-top: 10px">
+          <button type="button" class="primary" id="retryButton">重试</button>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="runPicker">
+        <h2>可查看的 Run</h2>
+        <div class="muted">
+          这段嵌入会话只钉定了项目，没有钉定单个 Run；你可以打开项目内的任意 Run。
+        </div>
+        <div class="run-list" id="runList" style="margin-top: 10px"></div>
+      </section>
+
+      <section class="hidden" id="board">
+        <div class="panel">
+          <div class="board-head">
+            <div>
+              <h2 id="boardTitle">—</h2>
+              <div class="muted" id="boardMeta"></div>
+            </div>
+            <div class="action-row" id="boardActions"></div>
+          </div>
+          <div class="lanes" id="stageLanes"></div>
+          <div class="status-line" id="boardStatus"></div>
+        </div>
+
+        <div class="panel">
+          <h2>当前审核关口</h2>
+          <div id="reviewBody"></div>
+        </div>
+
+        <div class="panel">
+          <h2>产物</h2>
+          <div id="artifactList"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const state = {
+        integrationId: null,
+        pinnedRunId: null,
+        token: null,
+        session: null,
+        board: null,
+        // The framing document's origin, or null when this page is not framed.
+        // Used as the one target for postMessage: see resolveParentOrigin().
+        parentOrigin: null,
+        currentReviewRequestId: null,
+        countdownTimer: null,
+      };
+      const $ = (id) => document.getElementById(id);
+
+      const runStatusLabels = {
+        draft: "草稿",
+        queued: "已排队",
+        running: "进行中",
+        waiting_review: "待审核",
+        paused: "已暂停",
+        completed: "已完成",
+        failed: "失败",
+        cancelled: "已取消",
+      };
+      const stageStatusLabels = {
+        pending: "待开始",
+        queued: "已排队",
+        running: "执行中",
+        waiting_review: "待审核",
+        approved: "已通过",
+        rejected: "已驳回",
+        completed: "已完成",
+        failed: "失败",
+        skipped: "已跳过",
+        cancelled: "已取消",
+      };
+      const reviewRequestStatusLabels = {
+        open: "待审核",
+        approved: "已通过",
+        rejected: "已驳回",
+        cancelled: "已取消",
+        superseded: "已失效",
+      };
+      const reviewDecisionLabels = {
+        approve: "通过",
+        approve_with_changes: "带修改通过",
+        request_changes: "要求修改",
+        reject: "驳回",
+        reopen: "重新打开",
+        cancel: "取消审核",
+      };
+      // Reviewing is the one write an embed session may be granted, so these are
+      // the only buttons the page can ever offer.
+      const reviewDecisions = [
+        { key: "approve", label: "通过", tone: "primary" },
+        { key: "approve_with_changes", label: "带修改通过", tone: "" },
+        { key: "request_changes", label: "要求修改", tone: "" },
+        { key: "reject", label: "驳回", tone: "danger" },
+      ];
+      // A change request or a rejection with no explanation leaves the producer
+      // with nothing to act on, so the page insists on one. The API stays
+      // permissive for every other client; this is a page-level rule.
+      const decisionsRequiringComment = ["request_changes", "reject"];
+      // Fallback labels so a stage is never shown as a bare key, even before the
+      // pipeline snapshot is available.
+      const fallbackStageLabels = {
+        intake: "需求整理",
+        plan: "制作方案",
+        script: "口播脚本",
+        storyboard: "分镜设计",
+        asset_generation: "素材生成",
+        asset_review: "素材审核",
+        edit: "剪辑方案",
+        compose: "视频合成",
+        final_review: "终审",
+        export: "导出交付",
+      };
+
+      const scopeLabels = {
+        "project:read": "读项目",
+        "run:read": "读 Run",
+        "asset:read": "读素材",
+        "library:read": "读素材库",
+        "run:review": "提交审核",
+      };
+
+      function escapeHtml(value) {
+        return String(value === null || value === undefined ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function toneForRunStatus(status) {
+        if (status === "completed") return "ok";
+        if (status === "failed" || status === "cancelled") return "bad";
+        if (status === "waiting_review" || status === "paused") return "warn";
+        return "info";
+      }
+
+      function toneForStageStatus(status) {
+        if (status === "completed" || status === "approved") return "ok";
+        if (status === "failed" || status === "rejected") return "bad";
+        if (status === "waiting_review" || status === "running") return "warn";
+        return "mute";
+      }
+
+      function hasScope(scope) {
+        return Boolean(state.session && (state.session.scopes || []).indexOf(scope) >= 0);
+      }
+
+      function parseLocation() {
+        // ``/embed/{integration_id}`` and ``/embed/{integration_id}/run/{run_id}``.
+        // The integration id is taken from the *last* ``embed`` segment so a
+        // deployment mounted under a path prefix still parses.
+        const segments = window.location.pathname.split("/").filter(Boolean);
+        const index = segments.lastIndexOf("embed");
+        const tail = index >= 0 ? segments.slice(index + 1) : [];
+        return {
+          integrationId: tail[0] || null,
+          pinnedRunId: tail[1] === "run" && tail[2] ? tail[2] : null,
+        };
+      }
+
+      function readToken() {
+        // The fragment is preferred: it is never sent to the server and never
+        // forwarded in Referer, so the credential stays out of access logs.
+        const hash = window.location.hash.startsWith("#")
+          ? window.location.hash.slice(1)
+          : "";
+        const fromHash = new URLSearchParams(hash).get("token");
+        const fromQuery = new URLSearchParams(window.location.search).get("token");
+        return (fromHash || fromQuery || "").trim();
+      }
+
+      function scrubToken() {
+        // Once the token is in memory it is removed from the address bar, so it
+        // does not survive in history entries, bookmarks or screenshots.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("token");
+        url.hash = "";
+        window.history.replaceState(null, "", url.pathname + (url.search || ""));
+      }
+
+      function resolveParentOrigin() {
+        // ``frame-ancestors`` already decided who may frame this page, so the
+        // framing document's own origin is the only target worth posting to. It
+        // comes from ``document.referrer``; when there is no referrer (opened
+        // top-level, or a ``no-referrer`` policy) the page simply stays quiet
+        // instead of broadcasting to ``"*"``.
+        if (window.parent === window) return null;
+        try {
+          const referrer = new URL(document.referrer);
+          return referrer.origin || null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function postToParent(message) {
+        if (!state.parentOrigin) return;
+        const payload = Object.assign(
+          { integration_id: state.integrationId },
+          message,
+        );
+        window.parent.postMessage(payload, state.parentOrigin);
+      }
+
+      function notifyResize() {
+        postToParent({
+          type: "s2v.embed.resize",
+          height: Math.ceil(document.documentElement.scrollHeight),
+        });
+      }
+
+      function setBoardStatus(message, tone = "") {
+        const line = $("boardStatus");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      function showAlert(title, body, retryable) {
+        $("alertTitle").textContent = title;
+        $("alertBody").textContent = body;
+        $("retryButton").classList.toggle("hidden", !retryable);
+        $("alertPanel").classList.remove("hidden");
+        $("runPicker").classList.add("hidden");
+        $("board").classList.add("hidden");
+        if (state.countdownTimer) {
+          window.clearInterval(state.countdownTimer);
+          state.countdownTimer = null;
+        }
+        notifyResize();
+      }
+
+      function hideAlert() {
+        $("alertPanel").classList.add("hidden");
+      }
+
+      async function api(path, options = {}) {
+        const headers = Object.assign({}, options.headers || {});
+        if (state.token) headers["X-Embed-Token"] = state.token;
+        if (options.body !== undefined) headers["Content-Type"] = "application/json";
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers,
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        });
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+          try {
+            payload = JSON.parse(text);
+          } catch (error) {
+            payload = null;
+          }
+        }
+        if (!response.ok) {
+          const detail = payload && payload.detail && typeof payload.detail === "object"
+            ? payload.detail
+            : {};
+          const failure = new Error(
+            detail.message || response.statusText || `HTTP ${response.status}`,
+          );
+          failure.status = response.status;
+          failure.code = detail.code || null;
+          throw failure;
+        }
+        return payload;
+      }
+
+      function remainingSeconds() {
+        if (!state.session || !state.session.expires_at) return 0;
+        return Math.max(
+          0,
+          Math.floor((new Date(state.session.expires_at).getTime() - Date.now()) / 1000),
+        );
+      }
+
+      function updateCountdown() {
+        if (!state.session) return;
+        const seconds = remainingSeconds();
+        const badge = $("sessionBadge");
+        badge.textContent = `嵌入会话 · 剩余 ${Math.ceil(seconds / 60)} 分钟`;
+        badge.className = `pill ${seconds <= 60 ? "bad" : seconds <= 180 ? "warn" : "info"}`;
+        if (seconds <= 0) {
+          showAlert(
+            "嵌入会话已过期",
+            "会话有效期已结束，页面不再读取任何数据。请回到调用方重新获取嵌入链接。",
+            false,
+          );
+        }
+      }
+
+      function renderHeader() {
+        const session = state.session;
+        $("integrationName").textContent = session.integration_name || "嵌入会话";
+        $("actorBadge").textContent = `${session.display_name || session.actor_id} · 外部终端用户`;
+        const scopes = session.scopes || [];
+        $("scopeBadge").textContent = scopes.length
+          ? scopes.map((scope) => scopeLabels[scope] || scope).join(" · ")
+          : "只读会话";
+        $("contextBadge").textContent = session.context.run_id
+          ? `已钉定 Run ${session.context.run_id}`
+          : `已钉定项目 ${session.context.project_id}`;
+        updateCountdown();
+      }
+
+      function stageLabelMap() {
+        const snapshot =
+          (state.board &&
+            state.board.run &&
+            state.board.run.pipeline_definition_snapshot) ||
+          {};
+        const map = Object.assign({}, fallbackStageLabels);
+        (snapshot.stages || []).forEach((stage) => {
+          if (stage && stage.stage_key) {
+            map[stage.stage_key] = stage.display_name || stage.stage_key;
+          }
+        });
+        return map;
+      }
+
+      function renderStages(lanes) {
+        const labels = stageLabelMap();
+        if (!lanes || !lanes.length) {
+          $("stageLanes").innerHTML = '<div class="empty">该 Run 尚未生成阶段</div>';
+          return;
+        }
+        $("stageLanes").innerHTML = lanes
+          .map((lane) => {
+            const stage = lane.stage || {};
+            const classes = ["lane"];
+            if (lane.current) classes.push("current");
+            if (stage.status === "waiting_review") classes.push("waiting");
+            if (stage.status === "failed") classes.push("failed");
+            const review = lane.review_request;
+            const reviewNote = review
+              ? ` · 审核第 ${review.iteration} 轮（${
+                  reviewRequestStatusLabels[review.status] || review.status
+                }）`
+              : "";
+            return `
+              <div class="${classes.join(" ")}">
+                <div class="lane-head">
+                  <strong>${escapeHtml(labels[stage.stage_key] || stage.stage_key || "-")}</strong>
+                  <span class="pill ${toneForStageStatus(stage.status)}">${escapeHtml(
+                    stageStatusLabels[stage.status] || stage.status || "-",
+                  )}</span>
+                </div>
+                <div class="lane-meta muted">
+                  产物 ${(lane.artifacts || []).length} · 素材 ${(lane.assets || []).length} · 作业 ${
+                    (lane.jobs || []).length
+                  }${reviewNote}
+                </div>
+              </div>`;
+          })
+          .join("");
+      }
+
+      function renderReview(board) {
+        const requests = (board.review_requests || []).filter(
+          (item) => item.status !== "superseded",
+        );
+        const active = requests.filter((item) => item.status === "open").slice(-1)[0];
+        const target = active || requests.slice(-1)[0];
+        state.currentReviewRequestId = target ? target.review_request_id : null;
+
+        if (!target) {
+          $("reviewBody").innerHTML =
+            '<div class="empty">该 Run 当前没有审核关口</div>';
+          return;
+        }
+
+        const canDecide = hasScope("run:review") && target.status === "open";
+        const invalidated = (board.invalidated_stages || []).length;
+        const focus = (target.review_focus || [])
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join("");
+        const criteria = (target.success_criteria || [])
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join("");
+        const buttons = canDecide
+          ? `<div class="action-row">
+               ${reviewDecisions
+                 .map(
+                   (item) =>
+                     `<button type="button" class="${item.tone}" data-review-decision="${item.key}">${escapeHtml(
+                       item.label,
+                     )}</button>`,
+                 )
+                 .join("")}
+             </div>
+             <textarea id="embedDecisionComment" placeholder="说明（要求修改或驳回时必填，会作为不可修改的审核记录保存）"></textarea>`
+          : `<div class="empty">${
+              hasScope("run:review")
+                ? "当前审核关口已关闭，无法再提交决定。"
+                : "只读会话：本嵌入会话未授予 run:review，不能在此提交审核决定。"
+            }</div>`;
+
+        $("reviewBody").innerHTML = `
+          <div class="action-row">
+            <span class="pill ${target.status === "open" ? "warn" : "mute"}">${escapeHtml(
+              reviewRequestStatusLabels[target.status] || target.status,
+            )}</span>
+            <span class="pill info">${escapeHtml(stageLabelMap()[target.stage_key] || target.stage_key)}</span>
+            <span class="pill">第 ${target.iteration} 轮</span>
+            ${
+              target.current_decision
+                ? `<span class="pill">最近决定 ${escapeHtml(
+                    reviewDecisionLabels[target.current_decision] || target.current_decision,
+                  )}</span>`
+                : ""
+            }
+            ${target.overdue ? '<span class="pill bad">已逾期</span>' : ""}
+            ${invalidated ? `<span class="pill bad">下游失效 ${invalidated} 个阶段</span>` : ""}
+          </div>
+          <div class="review-snapshot">
+            <div class="muted">审核对象类型<strong>${escapeHtml(
+              (target.artifact_scope || [])
+                .map((ref) => `${ref.artifact_type} v${ref.version}`)
+                .join(" · ") || "-",
+            )}</strong></div>
+            <div class="muted">通过后进入<strong>${escapeHtml(
+              stageLabelMap()[target.gates_stage_key] || target.gates_stage_key || "-",
+            )}</strong></div>
+            <div class="muted">审核人<strong>${escapeHtml(
+              target.assignee_user_id || "未指派",
+            )}</strong></div>
+          </div>
+          <div class="muted">审核关注点</div>
+          <ul class="focus-list">${focus || "<li>-</li>"}</ul>
+          <div class="muted">通过标准</div>
+          <ul class="focus-list">${criteria || "<li>-</li>"}</ul>
+          <div style="margin-top: 10px">${buttons}</div>`;
+      }
+
+      function renderArtifacts(timeline) {
+        const items = (timeline || []).slice(-8).reverse();
+        if (!items.length) {
+          $("artifactList").innerHTML = '<div class="empty">暂无产物</div>';
+          return;
+        }
+        $("artifactList").innerHTML = items
+          .map(
+            (item) => `
+              <div class="artifact-row">
+                <span class="pill">${escapeHtml(item.artifact_type)} v${escapeHtml(item.version)}</span>
+                <span>${escapeHtml(item.title || item.artifact_id)}</span>
+                <span class="muted">${escapeHtml(item.stage_key || "-")}${
+                  item.is_current ? "" : " · 历史版本"
+                }</span>
+              </div>`,
+          )
+          .join("");
+      }
+
+      function renderBoard() {
+        const board = state.board;
+        const labels = stageLabelMap();
+        $("boardTitle").textContent = board.run.run_id;
+        $("boardMeta").textContent = [
+          board.project && board.project.title ? `项目 ${board.project.title}` : null,
+          board.run.pipeline_key,
+          runStatusLabels[board.run.status] || board.run.status,
+          board.run.current_stage_key
+            ? `当前阶段 ${labels[board.run.current_stage_key] || board.run.current_stage_key}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        $("boardActions").innerHTML = state.pinnedRunId
+          ? '<span class="pill mute">Run 已钉定</span>'
+          : '<button type="button" id="backToRunsButton">返回 Run 列表</button>';
+        renderStages(board.stage_lanes || []);
+        renderReview(board);
+        renderArtifacts(board.artifact_timeline || []);
+      }
+
+      async function loadBoard(runId) {
+        hideAlert();
+        $("runPicker").classList.add("hidden");
+        $("board").classList.remove("hidden");
+        setBoardStatus("加载中…", "warn");
+        try {
+          state.board = await api(`/api/runs/${encodeURIComponent(runId)}/board`);
+        } catch (error) {
+          state.board = null;
+          showAlert("无法打开该 Run", error.message, false);
+          return;
+        }
+        state.pinnedRunId = state.pinnedRunId || runId;
+        renderBoard();
+        setBoardStatus("已同步", "");
+        notifyResize();
+      }
+
+      function renderRunList(runs) {
+        if (!runs.length) {
+          $("runList").innerHTML = '<div class="empty">该项目下暂无可查看的 Run</div>';
+          return;
+        }
+        $("runList").innerHTML = runs
+          .map(
+            (run) => `
+              <button type="button" class="run-card" data-open-run="${escapeHtml(run.run_id)}">
+                <span class="run-title">${escapeHtml(run.run_id)}</span>
+                <span class="pill ${toneForRunStatus(run.status)}">${escapeHtml(
+                  runStatusLabels[run.status] || run.status,
+                )}</span>
+                <span class="muted">${escapeHtml(run.current_stage_key || "-")}</span>
+              </button>`,
+          )
+          .join("");
+      }
+
+      async function loadRunList() {
+        hideAlert();
+        $("board").classList.add("hidden");
+        $("runPicker").classList.remove("hidden");
+        $("runList").innerHTML = '<div class="empty">加载中…</div>';
+        try {
+          const runs = await api(
+            `/api/projects/${encodeURIComponent(state.session.context.project_id)}/runs`,
+          );
+          renderRunList(runs || []);
+        } catch (error) {
+          $("runList").innerHTML = `<div class="empty">无法加载 Run 列表：${escapeHtml(
+            error.message,
+          )}</div>`;
+        }
+        notifyResize();
+      }
+
+      async function openRun(runId) {
+        // A run-pinned session may not wander: the server refuses it too, so
+        // failing here only saves a round trip and says the same thing.
+        if (state.pinnedRunId && state.pinnedRunId !== runId) {
+          showAlert(
+            "不可访问该 Run",
+            "这段嵌入会话只钉定了一个 Run，无法切换到其他 Run。",
+            false,
+          );
+          return;
+        }
+        await loadBoard(runId);
+      }
+
+      async function submitDecision(decision) {
+        const reviewRequestId = state.currentReviewRequestId;
+        if (!reviewRequestId) return;
+        const field = $("embedDecisionComment");
+        const comment = field && field.value.trim() ? field.value.trim() : null;
+        if (decisionsRequiringComment.indexOf(decision) >= 0 && !comment) {
+          setBoardStatus("请先填写说明，再提交“要求修改”或“驳回”。", "error");
+          return;
+        }
+        setBoardStatus(`提交审核决定：${reviewDecisionLabels[decision] || decision}`, "warn");
+        try {
+          await api(
+            `/api/review-requests/${encodeURIComponent(reviewRequestId)}/decisions`,
+            {
+              method: "POST",
+              body: {
+                decision,
+                comment,
+                // The end user of the host system is the reviewer of record. Its
+                // id is foreign-keyed to ``users``, and the decision path
+                // registers it before writing, so an id we have never seen is
+                // expected rather than a bug.
+                actor_user_id: state.session.actor_id,
+                actor_display_name: state.session.display_name || state.session.actor_id,
+              },
+            },
+          );
+        } catch (error) {
+          setBoardStatus(`提交失败：${error.message}`, "error");
+          return;
+        }
+        await loadBoard(state.board ? state.board.run.run_id : state.pinnedRunId);
+        setBoardStatus("审核决定已记录", "");
+      }
+
+      async function loadContent() {
+        if (state.session.context.run_id) {
+          await loadBoard(state.session.context.run_id);
+          return;
+        }
+        await loadRunList();
+      }
+
+      async function bootstrap() {
+        const parsed = parseLocation();
+        state.integrationId = parsed.integrationId;
+        state.pinnedRunId = parsed.pinnedRunId;
+        state.token = readToken();
+        state.parentOrigin = resolveParentOrigin();
+        scrubToken();
+
+        if (!state.integrationId || !state.token) {
+          showAlert(
+            "嵌入链接不可用",
+            "链接缺少集成标识或会话令牌。请回到调用方重新获取完整的嵌入链接。",
+            false,
+          );
+          return;
+        }
+
+        try {
+          state.session = await api(
+            `/api/embed/${encodeURIComponent(state.integrationId)}/session`,
+          );
+        } catch (error) {
+          if (error.code === "embed_session_invalid") {
+            // The server deliberately gives one verdict for expired, tampered
+            // with, revoked and wrong-integration tokens; the page keeps that
+            // stance instead of guessing which one it was.
+            showAlert(
+              "嵌入链接无效或已过期",
+              "这段嵌入会话已被撤销、已过期，或与当前集成不匹配。请回到调用方重新获取嵌入链接。",
+              false,
+            );
+          } else {
+            showAlert("无法连接服务", "网络或服务暂时不可用，可稍后重试。", true);
+          }
+          return;
+        }
+
+        hideAlert();
+        renderHeader();
+        state.countdownTimer = window.setInterval(updateCountdown, 1000);
+        postToParent({
+          type: "s2v.embed.ready",
+          context: state.session.context,
+          scopes: state.session.scopes,
+        });
+        await loadContent();
+      }
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!target || typeof target.closest !== "function") return;
+        const decisionButton = target.closest("[data-review-decision]");
+        if (decisionButton) {
+          submitDecision(decisionButton.getAttribute("data-review-decision"));
+          return;
+        }
+        const runCard = target.closest("[data-open-run]");
+        if (runCard) {
+          openRun(runCard.getAttribute("data-open-run"));
+          return;
+        }
+        if (target.closest("#backToRunsButton")) {
+          loadRunList();
+          return;
+        }
+        if (target.closest("#refreshButton")) {
+          loadContent();
+        }
+      });
+
+      window.addEventListener("message", (event) => {
+        // Only the framing document may steer this page, and only when the
+        // browser itself vouched for it (the origin we posted to).
+        if (!state.parentOrigin || event.origin !== state.parentOrigin) return;
+        const data = event.data;
+        if (!data || typeof data !== "object") return;
+        if (data.type === "s2v.embed.navigate" && data.run_id) {
+          openRun(String(data.run_id));
+        }
+      });
+
+      window.addEventListener("resize", notifyResize);
+
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(notifyResize).observe(document.body);
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>

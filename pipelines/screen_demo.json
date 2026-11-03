@@ -1,0 +1,272 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "screen_demo",
+  "display_name": "Screen Demo",
+  "description": "Create product walkthrough and software demo videos from a goal, URL, or step list using planned browser capture, interaction highlights, narration, captions, and composition.",
+  "version": "0.4.0",
+  "category": "screen_demo",
+  "status": "beta",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": ["douyin", "xiaohongshu", "bilibili", "wechat_channels", "internal_training", "generic"],
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "required_capabilities": ["browser_recording", "interaction_highlight", "video_composition", "storage"],
+  "optional_capabilities": ["screen_capture", "llm_generation", "tts", "subtitle_generation", "music_generation", "audio_processing"],
+  "artifact_contracts": {
+    "intake_brief": {"schema_key": "intake_brief.v1", "description": "Normalized demo request, target product, platform, duration, and format."},
+    "demo_flow_plan": {"schema_key": "demo_flow_plan.v1", "description": "Demo objective, audience, product surface, ordered steps, capture assumptions, and review risks."},
+    "recording_plan": {"schema_key": "recording_plan.v1", "description": "Browser route, viewport, login/data prerequisites, interaction steps, privacy masks, and capture settings."},
+    "screen_capture_manifest": {"schema_key": "screen_capture_manifest.v1", "description": "Recorded screen clips, screenshots, capture metadata, and recording status."},
+    "interaction_annotation_plan": {"schema_key": "interaction_annotation_plan.v1", "description": "Cursor, highlight, zoom, callout, subtitle, and voiceover timing plan."},
+    "edit_plan": {"schema_key": "edit_plan.v1", "description": "Timeline, overlays, audio mix, crop/reframe, and composition intent."},
+    "render_summary": {"schema_key": "render_summary.v1", "description": "Render metadata and asset pointer."},
+    "review_notes": {"schema_key": "review_notes.v1", "description": "Human review outcome and requested changes."},
+    "publish_package": {"schema_key": "publish_package.v1", "description": "Downloadable final package and access links."}
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V3.4",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/screen_demo.md",
+    "supported_use_cases": [
+      "software_feature_walkthrough",
+      "website_product_demo",
+      "internal_tool_training",
+      "release_note_demo"
+    ],
+    "capture_maturity": "planned_recording_contract",
+    "migration_policy": "This beta pipeline validates screen-demo orchestration and contracts before real browser capture workers and composition graph automation land in later versions."
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Demo Intake",
+      "description": "Normalize the product demo goal, product URL, target audience, platform, duration, and aspect ratio.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Brief preserves the requested demo goal.", "Audience, duration, platform, and aspect ratio are normalized."],
+      "required_input_artifacts": [],
+      "output_artifact_types": ["intake_brief"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "demo_plan",
+      "display_name": "Demo Flow Plan",
+      "description": "Create the demo objective, viewer promise, product path, and ordered walkthrough beats.",
+      "order": 2,
+      "depends_on_stage_keys": ["intake"],
+      "input_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "output_artifacts": [{"artifact_type": "demo_flow_plan", "schema_key": "demo_flow_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": false, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"},
+        {"capability": "browser_recording", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["demo goal", "viewer promise", "feature order", "account/data prerequisites", "capture feasibility"],
+        "success_criteria": ["The demo path is understandable before recording starts.", "Any login, staging data, or privacy blocker is explicit."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Demo plan contains a clear objective, ordered beats, and capture assumptions."],
+      "required_input_artifacts": ["intake_brief"],
+      "output_artifact_types": ["demo_flow_plan"],
+      "required_capabilities": ["browser_recording"],
+      "optional_capabilities": ["llm_generation"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "recording_plan",
+      "display_name": "Recording Plan",
+      "description": "Turn the approved demo flow into browser actions, viewport settings, masks, narration cues, and capture settings.",
+      "order": 3,
+      "depends_on_stage_keys": ["demo_plan"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "demo_flow_plan", "schema_key": "demo_flow_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "recording_plan", "schema_key": "recording_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": false, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"},
+        {"capability": "screen_capture", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["step accuracy", "viewport", "masking", "test data", "narration cues"],
+        "success_criteria": ["Recording steps are reproducible.", "Sensitive fields and unstable UI areas are called out."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Recording plan includes route, viewport, interaction steps, and capture settings."],
+      "required_input_artifacts": ["intake_brief", "demo_flow_plan"],
+      "output_artifact_types": ["recording_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": ["llm_generation", "screen_capture"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "capture",
+      "display_name": "Screen Capture",
+      "description": "Record browser or desktop interactions. In V3 this remains planned until real recording worker payloads are implemented.",
+      "order": 4,
+      "depends_on_stage_keys": ["recording_plan"],
+      "input_artifacts": [{"artifact_type": "recording_plan", "schema_key": "recording_plan.v1"}],
+      "output_artifacts": [{"artifact_type": "screen_capture_manifest", "schema_key": "screen_capture_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "browser_recording", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "screen_capture", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Capture manifest records clips or an explicit planned-capture blocker."],
+      "required_input_artifacts": ["recording_plan"],
+      "output_artifact_types": ["screen_capture_manifest"],
+      "required_capabilities": ["browser_recording"],
+      "optional_capabilities": ["screen_capture"],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "annotation",
+      "display_name": "Interaction Annotation",
+      "description": "Plan cursor emphasis, zooms, callouts, captions, and optional narration/audio cues on top of the captured screen media.",
+      "order": 5,
+      "depends_on_stage_keys": ["capture"],
+      "input_artifacts": [
+        {"artifact_type": "recording_plan", "schema_key": "recording_plan.v1"},
+        {"artifact_type": "screen_capture_manifest", "schema_key": "screen_capture_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "interaction_annotation_plan", "schema_key": "interaction_annotation_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "interaction_highlight", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "subtitle_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Annotation plan identifies highlights, callouts, captions, and optional audio cues."],
+      "required_input_artifacts": ["recording_plan", "screen_capture_manifest"],
+      "output_artifact_types": ["interaction_annotation_plan"],
+      "required_capabilities": ["interaction_highlight"],
+      "optional_capabilities": ["subtitle_generation", "tts", "music_generation"],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Demo Edit Plan",
+      "description": "Create the screen-demo timeline, reframing, overlay, subtitle, and audio mix plan.",
+      "order": 6,
+      "depends_on_stage_keys": ["annotation"],
+      "input_artifacts": [
+        {"artifact_type": "screen_capture_manifest", "schema_key": "screen_capture_manifest.v1"},
+        {"artifact_type": "interaction_annotation_plan", "schema_key": "interaction_annotation_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Edit plan records timeline, overlays, framing, captions, and audio mix."],
+      "required_input_artifacts": ["screen_capture_manifest", "interaction_annotation_plan"],
+      "output_artifact_types": ["edit_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": ["video_composition", "audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "compose",
+      "display_name": "Compose Demo",
+      "description": "Render the screen demo from the edit plan and capture assets. In V3 this is planned but not auto-dispatched.",
+      "order": 7,
+      "depends_on_stage_keys": ["edit"],
+      "input_artifacts": [
+        {"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"},
+        {"artifact_type": "screen_capture_manifest", "schema_key": "screen_capture_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Render summary exists or the render blocker is explicit."],
+      "required_input_artifacts": ["edit_plan", "screen_capture_manifest"],
+      "output_artifact_types": ["render_summary"],
+      "required_capabilities": ["video_composition"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Final Demo Review",
+      "description": "Human review of the screen demo render before export.",
+      "order": 8,
+      "depends_on_stage_keys": ["compose"],
+      "input_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["step accuracy", "visual readability", "sensitive data", "caption timing", "audio mix"],
+        "success_criteria": ["Final render is approved for export or concrete revisions are recorded."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes record approval or requested fixes."],
+      "required_input_artifacts": ["render_summary"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "render_summary_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "export",
+      "display_name": "Export Demo Package",
+      "description": "Create the final screen-demo package and access links.",
+      "order": 9,
+      "depends_on_stage_keys": ["final_review"],
+      "input_artifacts": [
+        {"artifact_type": "render_summary", "schema_key": "render_summary.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "publish_package", "schema_key": "publish_package.v1"}],
+      "tool_requirements": [{"capability": "storage", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Publish package contains render metadata and access link placeholders."],
+      "required_input_artifacts": ["render_summary", "review_notes"],
+      "output_artifact_types": ["publish_package"],
+      "required_capabilities": ["storage"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

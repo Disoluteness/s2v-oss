@@ -1,0 +1,157 @@
+# The API: a Service and its Deployment.
+#
+# The Service has no `type: LoadBalancer` and no NodePort. Ingress terminates
+# TLS (see 50-ingress.yaml) and reaches this ClusterIP; publishing the API
+# directly on every node would put an unauthenticated `/metrics` and an
+# HTTPS-less API on the host network, which is a choice a deployment file should
+# not make by default.
+apiVersion: v1
+kind: Service
+metadata:
+  name: s2v-api
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  # /metrics is on the same port and therefore same Service. That is fine while
+  # the Service stays internal; if a scraper needs a separate path in, give it its
+  # own Service with a NetworkPolicy rather than exposing this one.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s2v-api
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: api
+  strategy:
+    # Two replicas and a rolling update: the API serves reads for the whole
+    # duration of a roll, which is what makes a maintenance-free upgrade possible
+    # for everything that is not a schema change.
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: api
+    spec:
+      # Long enough for in-flight requests (a compose or an avatar poll can take
+      # a while) to finish after the pod is marked for deletion.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        # Makes the mounted storage volume writable by the unprivileged uid above.
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME
+          imagePullPolicy: IfNotPresent
+          command: ["uvicorn", "apps.api.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          volumeMounts:
+            - name: storage
+              mountPath: /app/storage
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            # A cold start imports the whole tool catalog and builds the registry;
+            # the startup probe keeps a slow boot from being killed by the liveness
+            # probe as if it were a hang.
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            # Readiness, not liveness, is what gates traffic. The API answering
+            # `/api/health` is the whole condition: a process that is up but
+            # cannot reach its database answers the port and fails every request.
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            # The image writes nothing into its own filesystem: bytecode is off
+            # (PYTHONDONTWRITEBYTECODE=1) and the two writable paths are mounted
+            # above. So the root filesystem can be read-only, which turns "a
+            # compromised request handler rewrites a module" from a possibility
+            # into a crash.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          lifecycle:
+            preStop:
+              # Endpoints are updated asynchronously; without a short pause the
+              # container can exit before the load balancer has stopped sending it
+              # requests, which shows up as a handful of 502s on every roll.
+              exec:
+                command: ["sleep", "5"]
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: s2v-storage
+        - name: tmp
+          emptyDir: {}
+---
+# Read-write-many, because api and every worker mount the same assets. A storage
+# class that cannot do RWX (most block-backed ones) is not compatible with
+# `OBJECT_STORAGE_BACKEND=local` at more than one replica — in that case point the
+# deployment at S3/MinIO instead and leave this claim out.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s2v-storage
+  namespace: s2v-studio
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi # CHANGE ME
+  # storageClassName: "" # set explicitly unless the cluster has a default

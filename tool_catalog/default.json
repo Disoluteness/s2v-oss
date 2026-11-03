@@ -1,0 +1,561 @@
+{
+  "tools": [
+    {
+      "tool_key": "rule_based_planner",
+      "display_name": "Rule-Based Planner",
+      "description": "Deterministic placeholder planner used before LLM planning is enabled.",
+      "capability": "llm_generation",
+      "provider": "internal",
+      "runtime_type": "local",
+      "best_for": ["MVP smoke tests", "deterministic placeholder artifacts"],
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "local_asset_upload",
+      "display_name": "Local Asset Upload",
+      "description": "Accepts user or provider-generated files and stores them in local object storage.",
+      "capability": "asset_ingestion",
+      "provider": "internal",
+      "runtime_type": "local",
+      "best_for": ["manual fallback", "local development", "provider output archival"],
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "local_object_storage",
+      "display_name": "Local Object Storage",
+      "description": "Filesystem-backed object storage with signed temporary access links.",
+      "capability": "storage",
+      "provider": "local",
+      "runtime_type": "local",
+      "best_for": ["local development", "MVP asset persistence"],
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_compose",
+      "display_name": "FFmpeg Compose",
+      "description": "Local video composition and post-processing through FFmpeg.",
+      "capability": "video_composition",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg"],
+      "best_for": ["video concatenation", "subtitle burn-in", "audio mixing"],
+      "input_contract": {
+        "required": ["avatar_video_asset_id"],
+        "properties": {
+          "avatar_video_asset_id": "Stored avatar_video_clip asset id.",
+          "subtitle_asset_id": "Optional subtitle_file asset id for SRT burn-in.",
+          "music_asset_id": "Optional background_music asset id for audio mixing.",
+          "width": "Output width, default 1080.",
+          "height": "Output height, default 1920."
+        }
+      },
+      "output_contract": {
+        "asset_type": "rendered_video",
+        "artifact_type": "render_summary",
+        "mime_type": "video/mp4"
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "html_canvas_renderer",
+      "display_name": "HTML Canvas Renderer",
+      "description": "Local renderer that turns a composition_graph into a self-contained HTML/Canvas preview.",
+      "capability": "video_composition",
+      "provider": "local",
+      "runtime_type": "local",
+      "best_for": ["composition preview", "branded captions", "motion-graphics validation"],
+      "input_contract": {
+        "required": ["composition_graph"],
+        "properties": {
+          "composition_graph": "Renderer-neutral composition graph artifact payload.",
+          "preview_time_seconds": "Timeline position used for server-side first-frame validation."
+        }
+      },
+      "output_contract": {
+        "asset_type": "html_canvas_preview",
+        "artifact_type": "canvas_render_report",
+        "mime_type": "text/html"
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 1,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "preview",
+        "supports_preview": true,
+        "deterministic": true,
+        "notes": ["Generates a browser preview, not a final encoded video."]
+      },
+      "fallback_tool_keys": ["ffmpeg_compose"]
+    },
+    {
+      "tool_key": "quality_gate_runner",
+      "display_name": "Quality Gate Runner",
+      "description": "Local final-render quality checks using ffprobe and ffmpeg filters.",
+      "capability": "quality_gate",
+      "provider": "local",
+      "runtime_type": "local",
+      "required_binaries": ["ffprobe", "ffmpeg"],
+      "best_for": [
+        "final render validation",
+        "resolution checks",
+        "audio loudness checks",
+        "black frame and freeze detection",
+        "caption safe-area review"
+      ],
+      "input_contract": {
+        "required": ["render_asset_id"],
+        "properties": {
+          "render_asset_id": "Stored rendered_video asset id.",
+          "render_summary_artifact_id": "Optional render_summary artifact id.",
+          "composition_graph_artifact_id": "Optional composition_graph artifact id.",
+          "min_score": "Minimum passing score, default 80."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "quality_report",
+        "status": "passed, warning, or failed",
+        "quality_score": "0-100 integer score."
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 5,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "validation",
+        "deterministic": true,
+        "notes": ["Warns before blocking by default; human review decides policy."]
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_edit_tools",
+      "display_name": "FFmpeg Edit Tools",
+      "description": "Local video editing utilities for trim, concat, subtitle burn-in, reframing, watermarking, cover generation, and export variants.",
+      "capability": "video_editing",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg", "ffprobe"],
+      "best_for": [
+        "trim",
+        "concat",
+        "subtitle burn-in",
+        "auto reframe",
+        "watermark",
+        "cover generation",
+        "multi-version export"
+      ],
+      "input_contract": {
+        "required": ["operation", "source_asset_id or source_asset_ids"],
+        "properties": {
+          "operation": "trim, concat, subtitle_burn_in, auto_reframe, watermark, cover_generation, or export_versions.",
+          "source_asset_id": "Single source video asset id.",
+          "source_asset_ids": "Ordered source video asset ids for concat.",
+          "subtitle_asset_id": "Subtitle file asset id for subtitle_burn_in.",
+          "variants": "Export variant specs for export_versions."
+        }
+      },
+      "output_contract": {
+        "asset_type": "edited_video or cover_image",
+        "artifact_type": "edit_operation_report"
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 10,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "production_local",
+        "deterministic": true,
+        "notes": ["Uses local FFmpeg encoding and source assets already stored in the run."]
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_subtitle_burn",
+      "display_name": "FFmpeg Subtitle Burn-In",
+      "description": "Burn generated subtitles into rendered videos.",
+      "capability": "subtitle_generation",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg"],
+      "best_for": ["subtitle burn-in", "local post-processing"],
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "local_srt_subtitles",
+      "display_name": "Local SRT Subtitle Generator",
+      "description": "Creates SRT subtitle files from timed spoken-script segments.",
+      "capability": "subtitle_generation",
+      "provider": "internal",
+      "runtime_type": "local",
+      "best_for": ["spoken-script subtitles", "local development", "deterministic tests"],
+      "input_contract": {
+        "required": ["segments"],
+        "properties": {
+          "segments": "Timed script segments with start_seconds, end_seconds, text, and caption."
+        }
+      },
+      "output_contract": {
+        "asset_type": "subtitle_file",
+        "mime_type": "application/x-subrip"
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "dashscope_planner",
+      "display_name": "DashScope Planner",
+      "description": "LLM-backed planning and script generation through DashScope.",
+      "capability": "llm_generation",
+      "provider": "dashscope",
+      "runtime_type": "api",
+      "required_env_vars": ["DASHSCOPE_API_KEY"],
+      "install_instructions": "Set DASHSCOPE_API_KEY in the service environment.",
+      "best_for": ["production plans", "spoken scripts", "storyboards"],
+      "fallback_tool_keys": ["rule_based_planner"]
+    },
+    {
+      "tool_key": "dashscope_tts",
+      "display_name": "DashScope TTS",
+      "description": "Chinese narration synthesis through DashScope-compatible TTS.",
+      "capability": "tts",
+      "provider": "dashscope",
+      "runtime_type": "api",
+      "required_env_vars": ["DASHSCOPE_API_KEY"],
+      "install_instructions": "Set DASHSCOPE_API_KEY in the service environment.",
+      "best_for": ["Chinese narration", "draft voiceover"],
+      "input_contract": {
+        "required": ["text"],
+        "properties": {
+          "text": "Chinese or multilingual text, 600 characters or fewer.",
+          "voice": "DashScope voice, default Cherry.",
+          "language_type": "Auto, Chinese, English, Japanese, or Korean."
+        }
+      },
+      "output_contract": {
+        "asset_type": "tts_audio",
+        "mime_type": "audio/wav",
+        "audio_url": "Provider temporary URL before archive."
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "dashscope_image",
+      "display_name": "DashScope Image Generation",
+      "description": "Image generation adapter placeholder for DashScope-compatible image models.",
+      "capability": "image_generation",
+      "provider": "dashscope",
+      "runtime_type": "api",
+      "required_env_vars": ["DASHSCOPE_API_KEY"],
+      "install_instructions": "Set DASHSCOPE_API_KEY in the service environment.",
+      "best_for": ["storyboard images", "background plates", "product mood images"],
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "dashscope_avatar_video",
+      "display_name": "DashScope Avatar Video",
+      "description": "Digital-human or avatar video generation through DashScope-compatible services.",
+      "capability": "avatar_video",
+      "provider": "dashscope",
+      "runtime_type": "api",
+      "required_env_vars": ["DASHSCOPE_API_KEY"],
+      "install_instructions": "Set DASHSCOPE_API_KEY in the service environment.",
+      "best_for": ["Chinese spokesperson clips", "avatar-led ads"],
+      "input_contract": {
+        "required": ["image_url", "audio_url"],
+        "properties": {
+          "image_url": "Publicly reachable portrait image URL.",
+          "audio_url": "Publicly reachable voice audio URL. wan2.2-s2v requires under 20 seconds and under 15 MB.",
+          "face_bbox": "[x1, y1, x2, y2] face crop box in the source image. Only the EMO dialect consumes it.",
+          "ext_bbox": "[x1, y1, x2, y2] extended body/head crop box. Only the EMO dialect consumes it.",
+          "resolution": "wan2.2-s2v output tier, 480P or 720P (default 480P).",
+          "model": "DashScope avatar model, default wan2.2-s2v (Wanxiang digital human). An emo* name selects the legacy EMO dialect."
+        }
+      },
+      "output_contract": {
+        "external_task_id": "Provider async task id.",
+        "status": "submitted, running, succeeded, failed, cancelled, or archived.",
+        "video_url": "Provider result URL before it is archived to object storage.",
+        "asset_id": "Stored asset id after archive."
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "local_mvp_avatar_preview",
+      "display_name": "Local MVP Avatar Preview",
+      "description": "Deterministic local avatar-style preview used when provider avatar generation is not configured.",
+      "capability": "avatar_video",
+      "provider": "internal",
+      "runtime_type": "local",
+      "status": "degraded",
+      "status_reason": "Local preview can exercise the workflow but does not produce a real digital-human provider result.",
+      "best_for": ["local preview", "smoke tests", "provider fallback"],
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "elevenlabs_tts",
+      "display_name": "ElevenLabs TTS",
+      "description": "Voiceover generation through ElevenLabs.",
+      "capability": "tts",
+      "provider": "elevenlabs",
+      "runtime_type": "api",
+      "required_env_vars": ["ELEVENLABS_API_KEY"],
+      "install_instructions": "Set ELEVENLABS_API_KEY in the service environment.",
+      "best_for": ["English narration", "expressive voiceover"],
+      "fallback_tool_keys": ["dashscope_tts", "local_asset_upload"]
+    },
+    {
+      "tool_key": "elevenlabs_music",
+      "display_name": "ElevenLabs Music",
+      "description": "Background music generation through ElevenLabs.",
+      "capability": "music_generation",
+      "provider": "elevenlabs",
+      "runtime_type": "api",
+      "required_env_vars": ["ELEVENLABS_API_KEY"],
+      "install_instructions": "Set ELEVENLABS_API_KEY in the service environment.",
+      "best_for": ["short ad background music", "quick mood tracks"],
+      "input_contract": {
+        "required": ["prompt"],
+        "properties": {
+          "prompt": "Music prompt with genre, mood, instruments, tempo, and usage.",
+          "music_length_ms": "10000 to 300000.",
+          "force_instrumental": "true for background music."
+        }
+      },
+      "output_contract": {
+        "asset_type": "background_music",
+        "mime_type": "audio/mpeg"
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "ffmpeg_media_probe",
+      "display_name": "FFmpeg Media Probe",
+      "description": "Local media metadata probing and representative frame extraction for uploaded source video and audio files.",
+      "capability": "media_analysis",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg", "ffprobe"],
+      "best_for": ["source video metadata", "duration and stream inspection", "representative frame sampling", "local media ingest checks"],
+      "input_contract": {
+        "required": ["source_asset_ids"],
+        "properties": {
+          "source_asset_ids": "Uploaded source media asset ids to inspect.",
+          "analysis_depth": "metadata, scene_summary, or full once deeper analysis is available."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "media_analysis_report",
+        "summary": "Stream metadata, duration, codec, frame size, representative frame assets, and analysis notes."
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "dashscope_asr",
+      "display_name": "DashScope ASR",
+      "description": "Speech-to-text transcription over the already-integrated DashScope credential; used by media analysis when a provider-reachable audio URL is available.",
+      "capability": "speech_to_text",
+      "provider": "dashscope",
+      "runtime_type": "api",
+      "required_env_vars": ["DASHSCOPE_API_KEY"],
+      "best_for": ["source audio transcription", "clip planning transcripts", "multilingual spoken content"],
+      "input_contract": {
+        "required": ["audio_url"],
+        "properties": {
+          "audio_url": "Provider-reachable audio URL to transcribe.",
+          "language": "Optional language hint, e.g. zh-CN.",
+          "model": "Optional ASR model override."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "media_analysis_report",
+        "summary": "Verbatim transcript text plus the engine and model that produced it."
+      },
+      "fallback_tool_keys": ["local_transcript_placeholder"]
+    },
+    {
+      "tool_key": "local_transcript_placeholder",
+      "display_name": "Local Transcript Placeholder",
+      "description": "Deterministic placeholder transcript path used before ASR providers are configured.",
+      "capability": "speech_to_text",
+      "provider": "internal",
+      "runtime_type": "local",
+      "status": "degraded",
+      "status_reason": "Placeholder transcript can keep clip planning moving but does not transcribe audio.",
+      "best_for": ["source clip factory smoke tests", "manual transcript fallback"],
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "local_clip_selector",
+      "display_name": "Local Clip Selector",
+      "description": "Rule-based candidate clip selection from source media metadata, transcript notes, and user goals.",
+      "capability": "clip_selection",
+      "provider": "internal",
+      "runtime_type": "local",
+      "best_for": ["deterministic clip candidates", "source clip factory smoke tests", "manual review queues"],
+      "input_contract": {
+        "required": ["media_analysis_report"],
+        "properties": {
+          "media_analysis_report": "Current media analysis artifact payload.",
+          "target_clip_count": "Desired number of candidate short clips.",
+          "target_duration_seconds": "Approximate duration for each clip."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "clip_candidate_list",
+        "summary": "Candidate clip windows, rationale, score, and review status."
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_clip_export",
+      "display_name": "FFmpeg Clip Export",
+      "description": "Local clip trimming and export from approved source clip candidates.",
+      "capability": "clip_export",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg"],
+      "best_for": ["approved source clip trimming", "vertical clip exports", "batch clip generation"],
+      "input_contract": {
+        "required": ["clip_candidate_list"],
+        "properties": {
+          "clip_candidate_list": "Approved candidate clip windows to export.",
+          "render_profile": "Target aspect ratio, resolution, and caption handling."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "clip_export_manifest",
+        "asset_type": "rendered_video",
+        "mime_type": "video/mp4"
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "playwright_browser_recording",
+      "display_name": "Playwright Browser Recording",
+      "description": "Planned browser recording adapter for website and web-app walkthrough capture.",
+      "capability": "browser_recording",
+      "provider": "playwright",
+      "runtime_type": "local",
+      "required_binaries": ["node"],
+      "status": "degraded",
+      "status_reason": "Contract is available for planning, but the real recording worker payload is not implemented yet.",
+      "best_for": ["website product demo", "software feature walkthrough", "browser-based screen demo"],
+      "input_contract": {
+        "required": ["recording_plan"],
+        "properties": {
+          "recording_plan": "Approved recording_plan artifact payload with URL, viewport, actions, masks, and capture settings.",
+          "output_profile": "Target format, resolution, frame rate, and aspect ratio."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "screen_capture_manifest",
+        "asset_type": "source_video",
+        "mime_type": "video/mp4"
+      },
+      "quality_profile": {
+        "tier": "preview",
+        "supports_preview": true,
+        "deterministic": false,
+        "notes": ["Real browser recording is planned for a later worker implementation."]
+      },
+      "fallback_tool_keys": ["local_demo_recording_placeholder"]
+    },
+    {
+      "tool_key": "local_demo_recording_placeholder",
+      "display_name": "Local Demo Recording Placeholder",
+      "description": "Deterministic placeholder for screen-demo capture planning before real browser recording is enabled.",
+      "capability": "browser_recording",
+      "provider": "internal",
+      "runtime_type": "local",
+      "status": "degraded",
+      "status_reason": "Keeps screen-demo orchestration testable but does not capture a real screen video.",
+      "best_for": ["screen demo smoke tests", "recording plan review", "manual capture fallback"],
+      "input_contract": {
+        "required": ["recording_plan"],
+        "properties": {
+          "recording_plan": "Approved recording steps and capture settings."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "screen_capture_manifest",
+        "summary": "Planned capture manifest placeholder."
+      },
+      "quality_profile": {
+        "tier": "preview",
+        "supports_preview": true,
+        "deterministic": true,
+        "notes": ["Does not produce a real recorded clip."]
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "local_screen_capture_placeholder",
+      "display_name": "Local Screen Capture Placeholder",
+      "description": "Placeholder still-frame capture path for screen-demo planning and manual screenshots.",
+      "capability": "screen_capture",
+      "provider": "internal",
+      "runtime_type": "local",
+      "status": "degraded",
+      "status_reason": "Screenshot capture is represented as a planning contract until real browser capture is enabled.",
+      "best_for": ["manual screenshot fallback", "screen demo smoke tests", "recording plan review"],
+      "output_contract": {
+        "artifact_type": "screen_capture_manifest",
+        "asset_type": "source_image"
+      },
+      "fallback_tool_keys": ["local_asset_upload"]
+    },
+    {
+      "tool_key": "local_interaction_highlight_planner",
+      "display_name": "Local Interaction Highlight Planner",
+      "description": "Rule-based interaction annotation planner for cursor emphasis, zoom regions, callouts, and caption cues.",
+      "capability": "interaction_highlight",
+      "provider": "internal",
+      "runtime_type": "local",
+      "best_for": ["screen demo callouts", "cursor highlight planning", "software walkthrough annotation"],
+      "input_contract": {
+        "required": ["screen_capture_manifest", "recording_plan"],
+        "properties": {
+          "screen_capture_manifest": "Capture manifest or planned capture placeholder.",
+          "recording_plan": "Approved interaction steps and timing hints."
+        }
+      },
+      "output_contract": {
+        "artifact_type": "interaction_annotation_plan",
+        "summary": "Timeline of cursor, zoom, highlight, callout, caption, and audio cues."
+      },
+      "quality_profile": {
+        "tier": "draft",
+        "supports_preview": true,
+        "deterministic": true
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "kling_video",
+      "display_name": "Kling Video",
+      "description": "Video generation through Kling-compatible APIs.",
+      "capability": "video_generation",
+      "provider": "kling",
+      "runtime_type": "api",
+      "required_env_vars": ["KLING_ACCESS_KEY", "KLING_SECRET_KEY"],
+      "install_instructions": "Set KLING_ACCESS_KEY and KLING_SECRET_KEY in the service environment.",
+      "best_for": ["cinematic clips", "motion references", "visual B-roll"],
+      "fallback_tool_keys": ["dashscope_avatar_video", "local_asset_upload"]
+    }
+  ]
+}

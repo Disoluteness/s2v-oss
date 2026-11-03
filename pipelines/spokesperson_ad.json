@@ -1,0 +1,292 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "spokesperson_ad",
+  "display_name": "Spokesperson Ad",
+  "description": "Generate a short vertical spokesperson advertisement from a Chinese script.",
+  "version": "0.1.0",
+  "category": "avatar_spokesperson",
+  "status": "draft",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": ["douyin", "xiaohongshu", "wechat_channels", "generic"],
+  "supported_aspect_ratios": ["9:16", "1:1", "16:9"],
+  "required_capabilities": ["avatar_video", "subtitle_generation", "video_composition"],
+  "optional_capabilities": ["tts", "music_generation", "image_generation"],
+  "artifact_contracts": {
+    "intake_brief": {"schema_key": "intake_brief.v1", "description": "Normalized user brief and raw script."},
+    "production_plan": {"schema_key": "production_plan.v1", "description": "Creative strategy, target format, and production constraints."},
+    "spoken_script": {"schema_key": "spoken_script.v1", "description": "Timed narration segments and captions."},
+    "shot_list": {"schema_key": "shot_list.v1", "description": "Scene-by-scene visual plan."},
+    "asset_manifest": {"schema_key": "asset_manifest.v1", "description": "Generated and referenced media assets."},
+    "review_notes": {"schema_key": "review_notes.v1", "description": "Human review outcome and requested changes."},
+    "edit_plan": {"schema_key": "edit_plan.v1", "description": "Timeline, mix, subtitles, and composition intent."},
+    "render_summary": {"schema_key": "render_summary.v1", "description": "Final render metadata and asset pointer."},
+    "publish_package": {"schema_key": "publish_package.v1", "description": "Downloadable final package and access links."}
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V1.1",
+    "product_surface": "script_to_video_service"
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Intake Brief",
+      "description": "Normalize the user script, brand, product, target platform, duration, and aspect ratio into a production brief.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Brief preserves the raw script.", "Brand, product, platform, duration, and aspect ratio are normalized."],
+      "required_input_artifacts": [],
+      "output_artifact_types": ["intake_brief"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "plan",
+      "display_name": "Production Plan",
+      "description": "Create the ad strategy, tone, asset plan, audio plan, and provider-sensitive production assumptions.",
+      "order": 2,
+      "depends_on_stage_keys": ["intake"],
+      "input_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "output_artifacts": [{"artifact_type": "production_plan", "schema_key": "production_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "avatar_video", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "video_composition", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["hook", "product promise", "provider assumptions", "duration fit"],
+        "success_criteria": ["The plan is suitable for a vertical spokesperson ad.", "The plan names required and optional media capabilities."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Plan contains a hook, creative strategy, and media plan."],
+      "required_input_artifacts": ["intake_brief"],
+      "output_artifact_types": ["production_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": ["avatar_video", "tts", "music_generation", "video_composition"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "script",
+      "display_name": "Spoken Script",
+      "description": "Turn the approved plan into a timed spoken script with captions.",
+      "order": 3,
+      "depends_on_stage_keys": ["plan"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "production_plan", "schema_key": "production_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"}],
+      "tool_requirements": [{"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["spoken language", "caption readability", "duration", "brand/product accuracy"],
+        "success_criteria": ["Script is speakable in the target duration.", "Captions are short enough for mobile viewing."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Segments include text, captions, and timing."],
+      "required_input_artifacts": ["intake_brief", "production_plan"],
+      "output_artifact_types": ["spoken_script"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "storyboard",
+      "display_name": "Storyboard",
+      "description": "Create a shot-level visual plan from the spoken script.",
+      "order": 4,
+      "depends_on_stage_keys": ["script"],
+      "input_artifacts": [{"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"}],
+      "output_artifacts": [{"artifact_type": "shot_list", "schema_key": "shot_list.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"},
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["shot sequence", "product visibility", "avatar suitability", "visual pacing"],
+        "success_criteria": ["Every spoken segment has a visual treatment.", "Shots fit the target platform and duration."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Shot list maps visuals to spoken segment ids."],
+      "required_input_artifacts": ["spoken_script"],
+      "output_artifact_types": ["shot_list"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": ["image_generation"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "asset_generation",
+      "display_name": "Asset Generation",
+      "description": "Generate or collect avatar, narration, subtitle, music, and reference assets.",
+      "order": 5,
+      "depends_on_stage_keys": ["storyboard"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "production_plan", "schema_key": "production_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "avatar_video", "required": true, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "subtitle_generation", "required": true, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": true, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Required media assets are available or have queued provider jobs."],
+      "required_input_artifacts": ["shot_list", "production_plan"],
+      "output_artifact_types": ["asset_manifest"],
+      "required_capabilities": ["avatar_video", "subtitle_generation"],
+      "optional_capabilities": ["tts", "music_generation", "image_generation"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "asset_review",
+      "display_name": "Asset Review",
+      "description": "Review generated and uploaded assets before edit planning.",
+      "order": 6,
+      "depends_on_stage_keys": ["asset_generation"],
+      "input_artifacts": [{"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["avatar quality", "audio clarity", "subtitle readability", "brand/product fit"],
+        "success_criteria": ["Reviewer approves available assets or records requested changes."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes capture approval or concrete repair requests."],
+      "required_input_artifacts": ["asset_manifest"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Edit Plan",
+      "description": "Create the final edit plan from reviewed assets.",
+      "order": 7,
+      "depends_on_stage_keys": ["asset_review"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Edit plan identifies selected assets, timing, subtitle, and audio mix intent."],
+      "required_input_artifacts": ["shot_list", "asset_manifest", "review_notes"],
+      "output_artifact_types": ["edit_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "compose",
+      "display_name": "Compose Video",
+      "description": "Render the final video from avatar, subtitles, narration, and optional music.",
+      "order": 8,
+      "depends_on_stage_keys": ["edit"],
+      "input_artifacts": [
+        {"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": true, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["A rendered video asset exists and matches target profile."],
+      "required_input_artifacts": ["edit_plan", "asset_manifest"],
+      "output_artifact_types": ["render_summary"],
+      "required_capabilities": ["video_composition"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Final Review",
+      "description": "Human review of the rendered video before export.",
+      "order": 9,
+      "depends_on_stage_keys": ["compose"],
+      "input_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["final video quality", "subtitle fit", "audio mix", "brand/product accuracy"],
+        "success_criteria": ["Final render is approved for export."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes record approval or requested fixes."],
+      "required_input_artifacts": ["render_summary"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "render_summary_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "export",
+      "display_name": "Export Package",
+      "description": "Create the final publish package and access links.",
+      "order": 10,
+      "depends_on_stage_keys": ["final_review"],
+      "input_artifacts": [
+        {"artifact_type": "render_summary", "schema_key": "render_summary.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "publish_package", "schema_key": "publish_package.v1"}],
+      "tool_requirements": [{"capability": "storage", "required": true, "selector_policy": "best_available", "dispatch_policy": "inline_system"}],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": true, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Publish package contains render asset id and access URL metadata."],
+      "required_input_artifacts": ["render_summary", "review_notes"],
+      "output_artifact_types": ["publish_package"],
+      "required_capabilities": ["storage"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

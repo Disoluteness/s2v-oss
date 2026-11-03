@@ -1,0 +1,3211 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-2: #f9fafb;
+        --line: #d9dee7;
+        --text: #18202e;
+        --muted: #667085;
+        --accent: #1662d4;
+        --accent-2: #0f4ead;
+        --good: #157f3b;
+        --warn: #a15c00;
+        --bad: #bd2a2a;
+        --shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #b8c0cc;
+        background: #f5f7fb;
+      }
+
+      button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: white;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      button.primary:hover {
+        background: var(--accent-2);
+      }
+
+      button.danger {
+        border-color: #f1b5b5;
+        color: var(--bad);
+      }
+
+      input,
+      select,
+      textarea {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+        color: var(--text);
+        padding: 9px 10px;
+        width: 100%;
+      }
+
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+
+      label {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      label > span {
+        color: var(--muted);
+      }
+
+      label.checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      label.checkbox input {
+        width: auto;
+      }
+
+      a {
+        color: var(--accent);
+        overflow-wrap: anywhere;
+      }
+
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(190px, 260px) 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.94);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
+
+      .brand a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .run-form {
+        display: grid;
+        grid-template-columns: minmax(220px, 420px) auto auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .status-line {
+        color: var(--muted);
+        font-size: 13px;
+        text-align: right;
+        min-width: 170px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 300px minmax(420px, 1fr) 360px;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .panel-body {
+        padding: 12px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .summary-grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        padding: 10px;
+        min-width: 0;
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      .metric-value {
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+
+      .stage-list,
+      .item-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .stage,
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        padding: 10px;
+      }
+
+      .stage.active {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(22, 98, 212, 0.12);
+      }
+
+      .stage-top,
+      .item-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .stage-name,
+      .item-name {
+        font-weight: 700;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .compact-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .compact-row {
+        display: grid;
+        grid-template-columns: minmax(88px, 120px) 1fr auto;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px;
+        min-width: 0;
+      }
+
+      .compact-row > div {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .execution-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .execution-actions button {
+        padding: 5px 8px;
+        font-size: 12px;
+      }
+
+      .error-help {
+        margin-top: 7px;
+        border-left: 3px solid #d64545;
+        background: #fff7f0;
+        color: #673818;
+        padding: 7px 9px;
+        border-radius: 6px;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .badge.good {
+        border-color: #b9dfc8;
+        color: var(--good);
+        background: #f0fbf4;
+      }
+
+      .badge.warn {
+        border-color: #f2d4a0;
+        color: var(--warn);
+        background: #fff8eb;
+      }
+
+      .badge.bad {
+        border-color: #f0b8b8;
+        color: var(--bad);
+        background: #fff5f5;
+      }
+
+      .review-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .action-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .field-grid .wide {
+        grid-column: 1 / -1;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        padding: 6px 9px;
+        font-size: 13px;
+      }
+
+      .tab.active {
+        background: #edf4ff;
+        border-color: #b8cff5;
+        color: var(--accent-2);
+      }
+
+      pre {
+        margin: 0;
+        overflow: auto;
+        max-height: 52vh;
+        background: #101828;
+        color: #eff4ff;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .preview {
+        display: grid;
+        gap: 10px;
+      }
+
+      .preview video,
+      .preview audio,
+      .preview img {
+        width: 100%;
+        max-height: 360px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: #0b1220;
+      }
+
+      .empty {
+        color: var(--muted);
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 18px;
+        text-align: center;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      @media (max-width: 1120px) {
+        .layout {
+          grid-template-columns: 280px 1fr;
+        }
+
+        .right-column {
+          grid-column: 1 / -1;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar,
+        .run-form,
+        .layout,
+        .summary-grid,
+        .summary-grid.three,
+        .compact-row,
+        .field-grid,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .field-grid .wide {
+          grid-column: auto;
+        }
+
+        .status-line {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span>脚本成片工作台</span>
+          <a href="/dashboard">项目仪表盘</a>
+          <a id="runBoardLink" href="/run-board">Run Board</a>
+        </div>
+        <form class="run-form" id="runForm">
+          <input id="runIdInput" name="runId" autocomplete="off" placeholder="run_id" />
+          <button class="primary" type="submit">加载</button>
+          <button id="refreshButton" type="button">刷新</button>
+        </form>
+        <div class="status-line" id="statusLine">未加载</div>
+      </header>
+
+      <main class="layout">
+        <section class="stack left-column">
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">创建样片</h2>
+              <span class="badge" id="createBadge">MVP</span>
+            </div>
+            <div class="panel-body">
+              <form class="stack" id="sampleRunForm">
+                <label>
+                  <span>流程</span>
+                  <select id="samplePipeline" name="pipeline_key">
+                    <option value="avatar_spokesperson">数字人口播</option>
+                    <option value="animated_explainer">动画解释</option>
+                    <option value="source_clip_factory">素材切片</option>
+                    <option value="screen_demo">屏幕演示</option>
+                    <option value="localization_dub">本地化配音</option>
+                    <option value="hybrid_story">混合素材故事</option>
+                  </select>
+                </label>
+                <label>
+                  <span>标题</span>
+                  <input id="sampleTitle" autocomplete="off" value="秋天第一杯奶茶" />
+                </label>
+                <label>
+                  <span>脚本</span>
+                  <textarea id="sampleScript" placeholder="输入口播脚本或分镜脚本">镜头 01｜3s｜近景｜节奏快
+台词：秋天第一杯奶茶，还没人给你点？
+字幕：秋天第一杯奶茶 还没人给你点？
+
+镜头 02｜4s｜特写｜节奏中
+台词：别等啦！自己冲就好！热水一倒，满屋子都是香浓的味儿～
+字幕：自己冲就好！热水一倒 满屋香浓
+
+镜头 03｜5s｜中景｜节奏中
+台词：0反式脂肪酸，喝着没负担。追剧自习来一杯，暖到心里去！
+字幕：0反式脂肪酸 追剧自习 暖到心里
+
+镜头 04｜3s｜近景｜节奏快
+台词：快去囤！你的秋天第一杯，我请了！
+字幕：快去囤！你的秋天第一杯 我请了！</textarea>
+                </label>
+                <div class="field-grid">
+                  <label>
+                    <span>品牌</span>
+                    <input id="brandName" autocomplete="off" value="茶小朵" />
+                  </label>
+                  <label>
+                    <span>产品</span>
+                    <input id="productName" autocomplete="off" value="冲泡奶茶" />
+                  </label>
+                  <label>
+                    <span>平台</span>
+                    <select id="targetPlatform">
+                      <option value="douyin">抖音</option>
+                      <option value="kuaishou">快手</option>
+                      <option value="xiaohongshu">小红书</option>
+                      <option value="bilibili">B站</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>时长</span>
+                    <input id="targetDuration" type="number" min="5" max="60" step="1" value="15" />
+                  </label>
+                  <label>
+                    <span>质量模式</span>
+	                    <select id="qualityMode" name="quality_mode">
+	                      <option value="local_preview">本地预览</option>
+	                      <option value="provider_audio">服务商音频</option>
+	                      <option value="provider_avatar">服务商数字人</option>
+	                    </select>
+                  </label>
+                  <label>
+                    <span>TTS 音色</span>
+                    <input id="ttsVoice" autocomplete="off" value="Cherry" />
+                  </label>
+                  <label class="checkbox wide">
+                    <input id="includeMusic" type="checkbox" checked />
+                    <span>生成背景音乐</span>
+                  </label>
+                  <label class="wide">
+                    <span>音乐提示词</span>
+                    <input
+                      id="musicPrompt"
+                      autocomplete="off"
+                      placeholder="Warm light guitar background music for a cozy Chinese milk tea ad, no vocals"
+                    />
+                  </label>
+                  <label class="wide">
+                    <span>人物图 URL</span>
+                    <input id="personImageUrl" autocomplete="off" placeholder="https://..." />
+                  </label>
+                  <label class="wide">
+                    <span>人物图文件</span>
+                    <input id="personImageFile" type="file" accept="image/*" />
+                  </label>
+                  <label class="wide">
+                    <span>产品图 URL</span>
+                    <input id="productImageUrl" autocomplete="off" placeholder="https://..." />
+                  </label>
+                  <label class="wide">
+                    <span>产品图文件</span>
+                    <input id="productImageFile" type="file" accept="image/*" />
+                  </label>
+                  <label class="wide">
+                    <span>品牌 Logo URL</span>
+                    <input id="brandLogoUrl" autocomplete="off" placeholder="https://..." />
+                  </label>
+                  <label class="wide">
+                    <span>品牌 Logo 文件</span>
+                    <input id="brandLogoFile" type="file" accept="image/*" />
+                  </label>
+                </div>
+                <div class="action-row">
+                  <button class="primary" id="createSampleButton" type="submit">生成样片</button>
+                  <button id="fillFromRunButton" type="button">填入当前任务</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">阶段</h2>
+              <span class="badge" id="runStatusBadge">-</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="summary-grid">
+                  <div class="metric">
+                    <div class="metric-label">任务</div>
+                    <div class="metric-value" id="metricRun">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">流程</div>
+                    <div class="metric-value" id="metricPipeline">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">当前</div>
+                    <div class="metric-value" id="metricStage">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">资产</div>
+                    <div class="metric-value" id="metricAssets">0</div>
+                  </div>
+                </div>
+                <div class="stage-list" id="stageList">
+                  <div class="empty">等待 run</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="stack">
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">运行检查</h2>
+              <span class="badge" id="planBadge">未预检</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="action-row">
+                  <button id="runPreflightButton" type="button">预检</button>
+                  <button id="buildExecutionPlanButton" type="button">生成执行方案</button>
+                  <button class="primary" id="startRunButton" type="button">启动任务</button>
+                </div>
+                <div class="summary-grid three">
+                  <div class="metric">
+                    <div class="metric-label">策略</div>
+                    <div class="metric-value" id="planPolicy">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">阻塞</div>
+                    <div class="metric-value" id="planBlocked">0</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">决策</div>
+                    <div class="metric-value" id="planDecisionCount">0</div>
+                  </div>
+                </div>
+                <div class="compact-list" id="planIssueList">
+                  <div class="empty">暂无检查结果</div>
+                </div>
+                <div class="compact-list" id="planDecisionList"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">生成</h2>
+              <span class="badge" id="workflowBadge">待命</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="action-row">
+	                  <button id="rerunLocalButton" type="button">重做本地样片</button>
+	                  <button id="rerunProviderButton" type="button">重做服务商音频成片</button>
+	                  <button id="rerunAvatarButton" type="button">重做服务商数字人</button>
+	                  <button id="refreshFinalLinkButton" type="button">刷新成片链接</button>
+	                  <button id="runQualityGateButton" type="button">运行质量检查</button>
+	                  <button id="generateCoverButton" type="button">生成封面</button>
+	                  <button id="exportVariantsButton" type="button">导出平台版本</button>
+                </div>
+                <div class="preview" id="finalLinkPreview"></div>
+                <div class="preview">提交数字人任务需要「人物图 + 口播音频」，run 里已有的资产会自动带出。服务商按 wan2.2-s2v 对口型，音频须短于 20 秒、小于 15MB —— 更长的口播脚本请先切段，否则会被服务商拒收。</div>
+                <div class="field-grid">
+                  <label class="wide">
+                    <span>公开访问域名</span>
+                    <input id="publicBaseUrl" autocomplete="off" placeholder="https://your-public-host.example" />
+                  </label>
+                  <label>
+                    <span>数字人人物图 URL</span>
+                    <input id="avatarPersonUrl" autocomplete="off" placeholder="https://..." />
+                  </label>
+                  <label>
+                    <span>口播音频 URL</span>
+                    <input id="avatarAudioUrl" autocomplete="off" placeholder="https://..." />
+                  </label>
+                </div>
+                <div class="action-row">
+                  <button id="generatePersonImageButton" type="button">生成人物图</button>
+                  <button id="uploadPersonImageButton" type="button">上传人物图</button>
+                  <button id="enqueueAvatarJobButton" type="button">提交数字人任务</button>
+                  <button id="processLatestJobButton" type="button">推进最新任务</button>
+                  <button id="refreshJobsButton" type="button">刷新任务</button>
+                </div>
+                <div class="item-list" id="jobList">
+                  <div class="empty">暂无任务</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">执行派发</h2>
+              <span class="badge" id="executionBadge">未生成</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="action-row">
+                  <button id="dispatchExecutionButton" type="button">派发就绪步骤</button>
+                </div>
+                <div class="summary-grid three">
+                  <div class="metric">
+                    <div class="metric-label">阶段</div>
+                    <div class="metric-value" id="executionTaskCount">0</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">可自动派发</div>
+                    <div class="metric-value" id="executionStepCount">0</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">已入队</div>
+                    <div class="metric-value" id="executionJobCount">0</div>
+                  </div>
+                </div>
+                <div class="compact-list" id="executionStepList">
+                  <div class="empty">暂无执行清单</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">审核</h2>
+              <span class="badge" id="reviewBadge">-</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="compact-list" id="reviewRequestCard">
+                  <div class="empty">暂无审核请求</div>
+                </div>
+                <textarea id="reviewComment" placeholder="审核意见（可选）"></textarea>
+                <div class="review-actions">
+                  <button class="primary" type="button" data-review="approved">通过</button>
+                  <button type="button" data-review="approved_with_changes">带修改通过</button>
+                  <button class="danger" type="button" data-review="rejected">驳回</button>
+                </div>
+                <div class="action-row">
+                  <button type="button" id="openRunBoardReviewButton">去 Run Board 处理审核</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">产物</h2>
+              <div class="tabs" id="artifactTabs"></div>
+            </div>
+            <div class="panel-body">
+              <pre id="artifactPayload">{}</pre>
+            </div>
+          </section>
+        </section>
+
+        <section class="stack right-column">
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">审核关口</h2>
+              <span class="badge" id="gateCount">0</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="muted" id="nextGate">尚未加载 run</div>
+                <div class="item-list" id="gateList">
+                  <div class="empty">暂无审核关口</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">资产</h2>
+              <span class="badge" id="assetCount">0</span>
+            </div>
+            <div class="panel-body">
+              <div class="stack">
+                <div class="item-list" id="assetList">
+                  <div class="empty">暂无资产</div>
+                </div>
+                <div class="preview" id="assetPreview"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">事件</h2>
+              <span class="badge" id="eventCount">0</span>
+            </div>
+            <div class="panel-body">
+              <div class="item-list" id="eventList">
+                <div class="empty">暂无事件</div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        runId: "",
+        run: null,
+        artifacts: [],
+        assets: [],
+        events: [],
+        invocations: [],
+        jobs: [],
+        dispatchPreview: null,
+        selectedArtifactId: null,
+        reviewRequests: [],
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      const labels = {
+        pipelines: {
+          avatar_spokesperson: "数字人口播",
+          spokesperson_ad: "旧版口播广告",
+          animated_explainer: "动画解释视频",
+          source_clip_factory: "素材切片工厂",
+          screen_demo: "屏幕演示",
+          localization_dub: "本地化配音",
+          hybrid_story: "混合素材故事",
+        },
+        stages: {
+          intake: "需求收集",
+          plan: "制作方案",
+          script: "口播脚本",
+          storyboard: "分镜规划",
+          asset_generation: "素材生成",
+          asset_review: "素材审核",
+          edit: "剪辑方案",
+          compose: "视频合成",
+          final_review: "成片审核",
+          export: "发布导出",
+          publish: "发布打包",
+          source_ingest: "素材接入",
+          analysis: "素材分析",
+          clip_selection: "片段筛选",
+          export_clips: "导出短视频",
+          demo_plan: "演示方案",
+          recording_plan: "录制方案",
+          capture: "屏幕录制",
+          annotation: "交互标注",
+          analyze: "源片分析",
+          localize_plan: "本地化方案",
+          translate: "翻译配音稿",
+          dub: "配音生成",
+          story_plan: "故事大纲",
+          visual_plan: "混合分镜",
+          ingest: "用户素材接入",
+          supplement: "补充素材生成",
+        },
+        artifacts: {
+          intake_brief: "需求简报",
+          production_plan: "制作方案",
+          spoken_script: "口播脚本",
+          shot_list: "分镜清单",
+          asset_manifest: "素材清单",
+          edit_plan: "剪辑方案",
+          composition_graph: "合成图",
+          canvas_render_report: "Canvas 渲染报告",
+          render_summary: "渲染结果",
+          quality_report: "质量报告",
+          edit_operation_report: "编辑操作报告",
+          review_notes: "审核记录",
+          publish_package: "发布包",
+          preflight_report: "预检报告",
+          execution_plan: "执行方案",
+          proposal_packet: "制作提案包",
+          stage_execution_manifest: "执行清单",
+          source_asset_manifest: "源素材清单",
+          source_media_review: "素材接入记录",
+          media_analysis_report: "素材分析报告",
+          video_analysis_brief: "视频分析摘要",
+          screening_room_scene_plan: "脚本放映室分镜",
+          clip_candidate_list: "候选片段",
+          clip_export_manifest: "短视频导出清单",
+          demo_flow_plan: "演示流程方案",
+          recording_plan: "录制方案",
+          screen_capture_manifest: "屏幕录制清单",
+          interaction_annotation_plan: "交互标注方案",
+          localization_plan: "本地化方案",
+          dubbing_manifest: "配音清单",
+          story_outline: "故事大纲",
+        },
+        capabilities: {
+          llm_generation: "文案规划",
+          subtitle_generation: "字幕生成",
+          video_composition: "视频合成",
+          storage: "存储发布",
+          tts: "语音合成",
+          music_generation: "音乐生成",
+          image_generation: "图片生成",
+          audio_processing: "音频处理",
+          avatar_video: "数字人视频",
+          asset_ingestion: "素材接入",
+          media_analysis: "媒体分析",
+          script_parsing: "脚本解析",
+          clip_selection: "片段筛选",
+          clip_export: "短视频导出",
+          speech_to_text: "语音转写",
+          browser_recording: "浏览器录屏",
+          screen_capture: "屏幕截图",
+          interaction_highlight: "交互高亮",
+          video_generation: "视频生成",
+        },
+        statuses: {
+          draft: "草稿",
+          pending: "待处理",
+          planned: "已规划",
+          ready: "可派发",
+          running: "运行中",
+          waiting_review: "待审核",
+          waiting_provider: "等待服务商",
+          waiting_stage: "等待阶段",
+          waiting_input: "等待输入",
+          queued: "已入队",
+          submitted: "已提交",
+          completed: "已完成",
+          succeeded: "已成功",
+          approved: "已通过",
+          approved_with_changes: "带修改通过",
+          rejected: "已驳回",
+          failed: "失败",
+          cancelled: "已取消",
+          archived: "已归档",
+          blocked: "阻塞",
+          skipped: "已跳过",
+          unsupported: "不支持",
+          existing_output: "已有产物",
+          unavailable: "不可用",
+          degraded: "降级可用",
+          available: "可用",
+        },
+        // Backend review keys stay English; only this display layer is localized.
+        reviewStatuses: {
+          open: "待审核",
+          approved: "已通过",
+          changes_requested: "要求修改",
+          rejected: "已驳回",
+          cancelled: "已取消",
+          superseded: "已作废",
+        },
+        reviewDecisions: {
+          approve: "通过",
+          approve_with_changes: "带修改通过",
+          request_changes: "要求修改",
+          reject: "驳回",
+          reopen: "重新打开",
+          cancel: "取消",
+        },
+        // `review_policy.review_focus` is a bounded key vocabulary declared in
+        // the pipeline DSL, so it is translated here rather than in the DSL.
+        reviewFocus: {
+          "account/data prerequisites": "账号与数据前置条件",
+          "audience fit": "受众契合度",
+          "audio clarity": "音频清晰度",
+          "audio mix": "混音",
+          "asset coverage": "素材覆盖",
+          "asset transitions": "素材衔接",
+          "beat order": "节拍顺序",
+          "brand fit": "品牌契合度",
+          "coverage of beats": "节拍覆盖度",
+          "dub timing": "配音时间轴",
+          "generated asset fit": "生成素材适配度",
+          "generation scope": "生成范围",
+          "glossary": "术语表",
+          "glossary adherence": "术语一致性",
+          "lip-sync policy": "口型策略",
+          "story coherence": "故事连贯性",
+          "story structure": "故事结构",
+          "style consistency": "风格一致性",
+          "target languages": "目标语言",
+          "timing fit": "时间轴契合度",
+          "translation accuracy": "翻译准确性",
+          "user asset coverage": "用户素材覆盖",
+          "user asset quality": "用户素材质量",
+          "voice casting": "配音选角",
+          "avatar quality": "数字人质量",
+          "avatar suitability": "数字人适配度",
+          "brand/product accuracy": "品牌与产品准确性",
+          "brand/product fit": "品牌与产品契合度",
+          "candidate relevance": "候选片段相关性",
+          "caption placement": "字幕位置",
+          "caption readability": "字幕可读性",
+          "caption timing": "字幕时间轴",
+          captions: "字幕",
+          "capture feasibility": "录制可行性",
+          "clip duration": "片段时长",
+          "clip quality": "片段质量",
+          "concept accuracy": "概念准确性",
+          "cut points": "剪辑点",
+          "demo goal": "演示目标",
+          "diagram accuracy": "图示准确性",
+          duration: "时长",
+          "duration fit": "时长契合度",
+          "explanation clarity": "讲解清晰度",
+          "explanatory thesis": "解释主线",
+          "feature order": "功能顺序",
+          "final video quality": "成片质量",
+          hook: "开场钩子",
+          "hook strength": "钩子强度",
+          masking: "打码脱敏",
+          "narration cues": "旁白提示",
+          "plain-language explanation": "通俗化讲解",
+          "platform fit": "平台适配度",
+          "product promise": "产品卖点",
+          "product visibility": "产品露出",
+          "provider assumptions": "服务商能力假设",
+          "render feasibility": "渲染可行性",
+          rights: "版权",
+          "rights and sensitivity": "版权与敏感内容",
+          "scene pacing": "场景节奏",
+          "sensitive data": "敏感数据",
+          "shot sequence": "分镜顺序",
+          "source media present": "源素材齐备",
+          "spoken language": "口播语言",
+          "step accuracy": "步骤准确性",
+          "subtitle fit": "字幕适配度",
+          "subtitle readability": "字幕可读性",
+          "target clip count": "目标片段数量",
+          "target duration": "目标时长",
+          "test data": "测试数据",
+          "usage rights": "使用授权",
+          "viewer promise": "观众收益",
+          viewport: "视口设置",
+          "visual accuracy": "视觉准确性",
+          "visual clarity": "视觉清晰度",
+          "visual metaphor": "视觉隐喻",
+          "visual pacing": "视觉节奏",
+          "visual readability": "视觉可读性",
+        },
+        executionPolicies: {
+          ready: "就绪",
+          degraded: "降级可执行",
+          blocked: "阻塞",
+          proceed: "可执行",
+          proceed_with_degradations: "降级执行",
+        },
+        decisions: {
+          use_tool: "使用工具",
+          use_degraded_tool: "降级使用",
+          skip_optional: "跳过可选项",
+          blocked: "阻塞",
+        },
+        providers: {
+          internal: "本地",
+          local: "本地存储",
+          ffmpeg: "FFmpeg",
+          dashscope: "通义百炼",
+          elevenlabs: "ElevenLabs",
+          kling: "可灵",
+          playwright: "Playwright",
+          user_input: "用户输入",
+        },
+        tools: {
+          rule_based_planner: "规则规划器",
+          dashscope_planner: "通义规划器",
+          dashscope_tts: "通义语音合成",
+          elevenlabs_tts: "ElevenLabs 语音合成",
+          elevenlabs_music: "ElevenLabs 音乐生成",
+          dashscope_image: "通义图片生成",
+          dashscope_avatar_video: "通义数字人视频",
+          local_mvp_avatar_preview: "本地数字人预览",
+          local_asset_upload: "本地素材上传",
+          local_object_storage: "本地对象存储",
+          local_srt_subtitles: "本地字幕生成",
+          ffmpeg_subtitle_burn: "FFmpeg 字幕烧录",
+          ffmpeg_compose: "FFmpeg 视频合成",
+          ffmpeg_edit_tools: "FFmpeg 编辑工具",
+          html_canvas_renderer: "HTML/Canvas 预览渲染",
+          ffmpeg_media_probe: "FFmpeg 媒体探测",
+          script_screening_room_parser: "脚本放映室解析器",
+          local_transcript_placeholder: "本地转写占位",
+          local_clip_selector: "本地片段筛选",
+          ffmpeg_clip_export: "FFmpeg 短视频导出",
+          playwright_browser_recording: "Playwright 浏览器录屏",
+          local_demo_recording_placeholder: "本地录屏占位",
+          local_screen_capture_placeholder: "本地截图占位",
+          local_interaction_highlight_planner: "本地交互高亮规划",
+          kling_video: "可灵视频生成",
+          workspace_reference_upload: "工作台素材上传",
+          local_mvp_music_bed: "本地背景音乐",
+          mvp_reference_asset: "样片参考素材",
+        },
+        assets: {
+          reference_image: "参考图",
+          product_image: "产品图",
+          brand_logo: "品牌标识",
+          person_image: "人物图",
+          narration_audio: "口播音频",
+          tts_audio: "语音音频",
+          subtitle_file: "字幕文件",
+          background_music: "背景音乐",
+          avatar_video_clip: "数字人视频",
+          rendered_video: "成片视频",
+          edited_video: "编辑视频",
+          cover_image: "封面图",
+          html_canvas_preview: "HTML/Canvas 预览",
+          source_video: "源视频",
+          source_audio: "源音频",
+          source_image: "源图片",
+          source_document: "源文档",
+          source_file: "源文件",
+          analysis_frame: "分析抽帧",
+        },
+        events: {
+          "run.created": "任务已创建",
+          "run.started": "任务已启动",
+          "run.waiting_review": "任务待审核",
+          "run.completed": "任务已完成",
+          "run.paused": "任务已暂停",
+          "run.resumed": "任务已恢复",
+          "run.cancelled": "任务已取消",
+          "run.start_blocked": "任务启动被阻塞",
+          "run.preflight_completed": "预检已完成",
+          "run.execution_plan_created": "执行方案已创建",
+          "run.proposal_packet_created": "制作提案包已创建",
+          "run.composition_graph_created": "合成图已创建",
+          "run.canvas_render_report_created": "Canvas 渲染报告已创建",
+          "run.quality_report_created": "质量报告已创建",
+          "run.edit_operation_completed": "编辑操作已完成",
+          "run.stage_execution_manifest_created": "执行清单已创建",
+          "run.stage_execution_dispatched": "执行清单已派发",
+          "run.rerun_requested": "已请求重跑",
+          "run.stage_skipped": "阶段已跳过",
+          "stage.started": "阶段已开始",
+          "stage.completed": "阶段已完成",
+          "stage.waiting_review": "阶段待审核",
+          "stage.review.approved": "阶段审核通过",
+          "stage.review.approved_with_changes": "阶段带修改通过",
+          "stage.review.rejected": "阶段被驳回",
+          "stage.review.cancelled": "阶段审核取消",
+          "stage.review_reopened": "阶段重新打开审核",
+          "stage.cancelled": "阶段已取消",
+          "stage.reset_for_rerun": "阶段已重置",
+          "stage.skipped": "阶段已跳过",
+          "artifact.created": "产物已创建",
+          "asset.uploaded": "资产已上传",
+          "tool.submitted": "工具已提交",
+          "tool.polled": "工具已轮询",
+          "tool.archived": "工具结果已归档",
+          "tool.completed": "工具已完成",
+          "job.queued": "任务已入队",
+          "job.retried": "任务已重试",
+          "job.waiting_provider": "等待服务商",
+          "job.provider_callback_received": "收到服务商回调",
+          "job.avatar_archived": "数字人视频已归档",
+          "job.final_composed": "成片已合成",
+          "job.publish_package_created": "发布包已创建",
+          "job.optional_asset_missing": "可选素材缺失",
+          "job.completed": "后台任务已完成",
+          "job.failed": "后台任务失败",
+          "job.cancelled": "后台任务已取消",
+          "provider.callback_received": "收到服务商回调",
+          "source_media.ingested": "源素材已接入",
+          "media_analysis.completed": "素材分析已完成",
+          "screening_room.run_created": "脚本放映室任务已创建",
+          "manifest_action.executed": "操作已执行",
+          "usage.ledger_entry_created": "用量已记录",
+          "mvp.assets_ready": "样片素材已就绪",
+          "mvp.sample_completed": "样片已完成",
+        },
+        messages: {
+          "Run created.": "任务已创建。",
+          "Run started.": "任务已启动。",
+          "Run is waiting for review.": "任务正在等待审核。",
+          "Run completed.": "任务已完成。",
+          "Stage started.": "阶段已开始。",
+          "Stage completed.": "阶段已完成。",
+          "Stage is waiting for review.": "阶段正在等待审核。",
+          "Stage artifact created.": "阶段产物已创建。",
+          "Proposal packet created.": "制作提案包已创建。",
+          "Composition graph created.": "合成图已创建。",
+          "HTML Canvas preview rendered.": "HTML/Canvas 预览已渲染。",
+          "Canvas render report created.": "Canvas 渲染报告已创建。",
+          "Stage execution manifest created.": "执行清单已创建。",
+          "Stage execution manifest dispatched background jobs.": "执行清单已派发后台任务。",
+          "Stage execution tool step queued.": "执行步骤已加入后台任务队列。",
+          "Video composed with FFmpeg.": "已使用 FFmpeg 完成视频合成。",
+          "Usage ledger entry created.": "已记录用量明细。",
+          "Tool invocation completed.": "工具调用已完成。",
+          "Provider callback received.": "已收到服务商回调。",
+          "Source media ingested.": "源素材已接入。",
+          "Source media analysis completed.": "源素材分析已完成。",
+          "Script screening room run created.": "脚本放映室任务已创建。",
+          "Background job completed.": "后台任务已完成。",
+          "Background job failed.": "后台任务失败。",
+          "Publish package created.": "发布包已创建。",
+          "Skipped stage placeholder artifact created.": "已为跳过阶段创建占位产物。",
+        },
+        actions: {
+          configure_or_replace_provider: "配置或更换服务商",
+          improve_optional_capability: "优化可选能力",
+          analyze_source_media: "分析源素材",
+        },
+        priorities: {
+          high: "高",
+          medium: "中",
+          low: "低",
+        },
+        errorCategories: {
+          auth: "鉴权",
+          quota: "额度",
+          input: "输入",
+          network: "网络",
+          runtime: "运行时",
+          provider: "服务商",
+          quality: "质量",
+          cancelled: "已取消",
+          unknown: "未知",
+        },
+      };
+
+      $("runForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        loadRun($("runIdInput").value.trim());
+      });
+
+      $("refreshButton").addEventListener("click", () => {
+        if (state.runId) loadRun(state.runId);
+      });
+
+      $("sampleRunForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          const payload = await buildSamplePayload();
+          await createSampleRun(payload, "创建 run 中");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      });
+
+      $("fillFromRunButton").addEventListener("click", populateFormFromRun);
+
+      $("rerunLocalButton").addEventListener("click", async () => {
+        try {
+          const payload = await buildPayloadFromCurrentRun("local_preview");
+          await createSampleRun(payload, "重做本地样片中");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      });
+
+      $("rerunProviderButton").addEventListener("click", async () => {
+        try {
+          const payload = await buildPayloadFromCurrentRun("provider_audio");
+          await createSampleRun(payload, "重做 Provider 音频中");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      });
+
+      $("rerunAvatarButton").addEventListener("click", async () => {
+        try {
+          const payload = await buildPayloadFromCurrentRun("provider_avatar");
+          await createSampleRun(payload, "重做 Provider 数字人中");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      });
+
+      $("refreshFinalLinkButton").addEventListener("click", refreshFinalLink);
+
+      // The full collaboration surface (comments, action items, history) lives
+      // on the Run Board; this page only carries the one-click decision.
+      $("openRunBoardReviewButton").addEventListener("click", () => {
+        const request = currentReviewRequest();
+        window.location.href = request
+          ? `/run-board?review_request_id=${encodeURIComponent(request.review_request_id)}`
+          : `/run-board?run_id=${encodeURIComponent(state.runId)}`;
+      });
+      $("runQualityGateButton").addEventListener("click", runQualityGates);
+      $("generateCoverButton").addEventListener("click", generateCover);
+      $("exportVariantsButton").addEventListener("click", exportVariants);
+      $("runPreflightButton").addEventListener("click", runPreflight);
+      $("buildExecutionPlanButton").addEventListener("click", buildExecutionPlan);
+      $("startRunButton").addEventListener("click", startRun);
+      $("enqueueAvatarJobButton").addEventListener("click", enqueueAvatarJob);
+      // The person image lives in the run, not in the URL boxes: without these
+      // two buttons a run whose manifest already produced every output has no
+      // way to gain a `person_image` asset, and 提交数字人任务 can never pass.
+      $("generatePersonImageButton").addEventListener("click", () =>
+        generatePersonImageForStep({ stage_key: "asset_generation" }),
+      );
+      $("uploadPersonImageButton").addEventListener("click", () =>
+        pickAndUploadReferenceImage("person_image", "数字人口播人物参考", "asset_generation"),
+      );
+      $("processLatestJobButton").addEventListener("click", processLatestJob);
+      $("dispatchExecutionButton").addEventListener("click", dispatchStageExecution);
+      $("refreshJobsButton").addEventListener("click", () => {
+        if (state.runId) loadJobs(state.runId);
+      });
+
+      document.querySelectorAll("[data-review]").forEach((button) => {
+        button.addEventListener("click", () => reviewCurrentStage(button.dataset.review));
+      });
+
+      async function loadRun(runId) {
+        if (!runId) {
+          setStatus("请输入 run_id", "warn");
+          return;
+        }
+        state.runId = runId;
+        window.history.replaceState(null, "", `?run_id=${encodeURIComponent(runId)}`);
+        $("runBoardLink").href = `/run-board?run_id=${encodeURIComponent(runId)}`;
+        setStatus("加载中", "warn");
+        try {
+          const [run, artifacts, assets, events, invocations, jobs, dispatchPreview, reviewRequests] =
+            await Promise.all([
+              api(`/api/runs/${runId}`),
+              api(`/api/runs/${runId}/artifacts?current_only=false`),
+              api(`/api/runs/${runId}/assets`),
+              api(`/api/runs/${runId}/events?limit=80`),
+              api(`/api/runs/${runId}/tool-invocations`),
+              fetchJobs(runId),
+              fetchDispatchPreview(runId),
+              fetchReviewRequests(runId),
+            ]);
+          Object.assign(state, {
+            run,
+            artifacts,
+            assets,
+            events,
+            invocations,
+            jobs,
+            dispatchPreview,
+            reviewRequests,
+          });
+          if (
+            artifacts.length &&
+            !artifacts.some((artifact) => artifact.artifact_id === state.selectedArtifactId)
+          ) {
+            state.selectedArtifactId = artifacts[artifacts.length - 1].artifact_id;
+          }
+          render();
+          setStatus("已同步", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function buildSamplePayload(overrides = {}) {
+        const payload = {
+          pipeline_key: $("samplePipeline").value,
+          title: $("sampleTitle").value.trim() || "MVP spokesperson sample",
+          raw_script: $("sampleScript").value.trim(),
+          brand_name: blankToNull($("brandName").value),
+          product_name: blankToNull($("productName").value),
+          target_platform: $("targetPlatform").value,
+          target_duration_seconds: Number($("targetDuration").value || 15),
+          quality_mode: $("qualityMode").value,
+          tts_voice: $("ttsVoice").value.trim() || "Cherry",
+          include_music: $("includeMusic").checked,
+          music_prompt: blankToNull($("musicPrompt").value),
+          public_base_url: blankToNull($("publicBaseUrl").value),
+        };
+
+        const personImage = await referenceFromInputs(
+          "personImageFile",
+          "personImageUrl",
+          "数字人口播人物参考",
+        );
+        const productImage = await referenceFromInputs(
+          "productImageFile",
+          "productImageUrl",
+          "产品图或包装参考",
+        );
+        const brandLogo = await referenceFromInputs("brandLogoFile", "brandLogoUrl", "品牌标识参考");
+        if (personImage) payload.person_image = personImage;
+        if (productImage) payload.product_image = productImage;
+        if (brandLogo) payload.brand_logo = brandLogo;
+        return { ...payload, ...overrides };
+      }
+
+      async function buildPayloadFromCurrentRun(qualityMode) {
+        if (!state.run) {
+          throw new Error("请先加载一个 run");
+        }
+        populateFormFromRun();
+        $("qualityMode").value = qualityMode;
+        const suffix =
+          qualityMode === "provider_avatar"
+            ? "Provider 数字人版"
+            : qualityMode === "provider_audio"
+              ? "Provider 音频版"
+              : "本地预览版";
+        return buildSamplePayload({
+          title: `${$("sampleTitle").value.trim() || "MVP 样片"} ${suffix}`,
+          quality_mode: qualityMode,
+        });
+      }
+
+      async function createSampleRun(payload, pendingText) {
+        if (!payload.raw_script) {
+          setStatus("请输入脚本", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus(pendingText, "warn");
+        try {
+          if (payload.pipeline_key && payload.pipeline_key !== "avatar_spokesperson") {
+            const result = await createGenericPipelineRun(payload);
+            $("runIdInput").value = result.run_id;
+            await loadRun(result.run_id);
+            setStatus("任务已创建并启动", "good");
+            return;
+          }
+          const { pipeline_key: _pipelineKey, ...mvpPayload } = payload;
+          const result = await api("/api/mvp/sample-runs", {
+            method: "POST",
+            body: mvpPayload,
+          });
+          $("runIdInput").value = result.run.run_id;
+          await loadRun(result.run.run_id);
+          renderFinalLink(result.final_video_url, result.render_asset);
+          setStatus("样片已生成", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function createGenericPipelineRun(payload) {
+        const project = await api("/api/projects", {
+          method: "POST",
+          body: {
+            title: payload.title || `${payload.pipeline_key} run`,
+            description: `Created from workspace for ${payload.pipeline_key}`,
+          },
+        });
+        const run = await api(`/api/projects/${project.project_id}/runs`, {
+          method: "POST",
+          body: {
+            pipeline_key: payload.pipeline_key,
+            raw_script: payload.raw_script,
+            brand_name: payload.brand_name,
+            product_name: payload.product_name,
+            target_platform: payload.target_platform,
+            target_duration_seconds: Math.min(Number(payload.target_duration_seconds || 30), 300),
+            aspect_ratio: payload.pipeline_key === "screen_demo" ? "16:9" : "9:16",
+            quality_mode: payload.quality_mode || null,
+          },
+        });
+        await api(`/api/runs/${run.run_id}/preflight`, { method: "POST" });
+        await api(`/api/runs/${run.run_id}/execution-plan`, { method: "POST" });
+        await api(`/api/runs/${run.run_id}/proposal-packet`, { method: "POST" });
+        await api(`/api/runs/${run.run_id}/stage-execution-manifest`, { method: "POST" });
+        await startRunWithIntentCheck(run.run_id);
+        return run;
+      }
+
+      async function startRunWithIntentCheck(runId) {
+        try {
+          await api(`/api/runs/${runId}/start`, {
+            method: "POST",
+            body: { accept_intent_downgrade: false },
+          });
+        } catch (error) {
+          if (error?.detail?.code === "cost_reservation_exceeds_budget") {
+            throw new Error(
+              `执行方案预留 ${error.detail.reserved_cost} ${error.detail.currency || "USD"}，` +
+                `超出预算 ${error.detail.budget_limit}。请提高预算或降低质量模式后重试。`,
+            );
+          }
+          if (error?.detail?.code !== "intent_downgrade_not_acknowledged") {
+            throw error;
+          }
+          const confirmed = window.confirm(
+            `本 run 声明的质量模式无法满足，继续启动会按下面的方式降级：\n\n${formatIntentDowngrades(error.detail.intent_downgrades || [])}\n\n确认接受降级并启动吗？`,
+          );
+          if (!confirmed) {
+            throw new Error("未确认质量降级，已取消启动");
+          }
+          await api(`/api/runs/${runId}/start`, {
+            method: "POST",
+            body: { accept_intent_downgrade: true },
+          });
+        }
+      }
+
+      function populateFormFromRun() {
+        if (!state.run) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        const input = state.run.input_payload || {};
+        $("samplePipeline").value = state.run.pipeline_key || input.pipeline_key || "avatar_spokesperson";
+        $("sampleTitle").value = input.brand_name || input.product_name || $("sampleTitle").value;
+        $("sampleScript").value = input.raw_script || $("sampleScript").value;
+        $("brandName").value = input.brand_name || "";
+        $("productName").value = input.product_name || "";
+        $("targetPlatform").value = input.target_platform || "douyin";
+        $("targetDuration").value = input.target_duration_seconds || 15;
+        $("qualityMode").value = input.quality_mode || $("qualityMode").value;
+      }
+
+      async function refreshFinalLink() {
+        const asset = findRenderAsset();
+        if (!asset) {
+          setStatus("当前 run 还没有成片资产", "warn");
+          return;
+        }
+        setStatus("刷新链接中", "warn");
+        try {
+          const link = await api(`/api/assets/${asset.asset_id}/access-link?expires_in_seconds=3600`);
+          renderFinalLink(link.url, asset);
+          setStatus("成片链接已刷新", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function runQualityGates() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        const asset = findRenderAsset();
+        if (!asset) {
+          setStatus("当前 run 还没有成片资产", "warn");
+          return;
+        }
+        setStatus("质量检查中", "warn");
+        try {
+          const result = await api(`/api/runs/${state.runId}/quality-gates`, {
+            method: "POST",
+            body: { render_asset_id: asset.asset_id },
+          });
+          setStatus(
+            `质量检查完成：${result.artifact.payload.status} · ${result.artifact.payload.quality_score}分`,
+            result.artifact.payload.status === "failed" ? "bad" : "good"
+          );
+          await loadRun(state.runId);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function generateCover() {
+        const asset = findRenderAsset();
+        if (!state.runId || !asset) {
+          setStatus("当前 run 还没有成片资产", "warn");
+          return;
+        }
+        setStatus("生成封面中", "warn");
+        try {
+          await api(`/api/runs/${state.runId}/edit-tools`, {
+            method: "POST",
+            body: {
+              operation: "cover_generation",
+              source_asset_id: asset.asset_id,
+              filename: "cover.jpg",
+              cover_time_seconds: 1,
+            },
+          });
+          setStatus("封面已生成", "good");
+          await loadRun(state.runId);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function exportVariants() {
+        const asset = findRenderAsset();
+        if (!state.runId || !asset) {
+          setStatus("当前 run 还没有成片资产", "warn");
+          return;
+        }
+        setStatus("导出平台版本中", "warn");
+        try {
+          await api(`/api/runs/${state.runId}/edit-tools`, {
+            method: "POST",
+            body: {
+              operation: "export_versions",
+              source_asset_id: asset.asset_id,
+              variants: [
+                {
+                  label: "抖音竖屏",
+                  filename: "douyin-version.mp4",
+                  render_profile_key: "douyin",
+                },
+                {
+                  label: "小红书竖版",
+                  filename: "xiaohongshu-version.mp4",
+                  render_profile_key: "xiaohongshu",
+                },
+              ],
+            },
+          });
+          setStatus("平台版本已导出", "good");
+          await loadRun(state.runId);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function runPreflight() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("预检中", "warn");
+        try {
+          const artifact = await api(`/api/runs/${state.runId}/preflight`, { method: "POST" });
+          state.selectedArtifactId = artifact.artifact_id;
+          await loadRun(state.runId);
+          setStatus("预检已完成", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function buildExecutionPlan() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("生成执行方案中", "warn");
+        try {
+          const artifact = await api(`/api/runs/${state.runId}/execution-plan`, { method: "POST" });
+          state.selectedArtifactId = artifact.artifact_id;
+          await loadRun(state.runId);
+          setStatus("执行方案已生成", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function startRun() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("启动中", "warn");
+        try {
+          await startRunWithIntentCheck(state.runId);
+          await loadRun(state.runId);
+          setStatus("任务已启动", "good");
+        } catch (error) {
+          await loadRun(state.runId);
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      function formatIntentDowngrades(downgrades) {
+        if (!downgrades.length) {
+          return "（服务端未给出明细）";
+        }
+        return downgrades
+          .map((item) => {
+            const stage = stageOrScopeLabel(item.stage_key);
+            const capability = capabilityLabel(item.capability) || item.capability;
+            const outcome =
+              item.kind === "capability_missing"
+                ? "没有可用工具，该能力会被跳过"
+                : `改用 ${item.selected_tool_key || "未知工具"}`;
+            return `· ${stage} / ${capability}：${outcome}`;
+          })
+          .join("\n");
+      }
+
+      async function enqueueAvatarJob() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        const personAsset = findReferenceAsset("person_image");
+        // `generate_tts_audio` stores `tts_audio`; nothing ever creates
+        // `narration_audio` as an asset type (the engine accepts both). Look up
+        // the real one first so the audio box does not have to be filled by hand.
+        const narrationAsset = findAssetByType("tts_audio") || findAssetByType("narration_audio");
+        const payload = {
+          person_image_asset_id: personAsset?.asset_id || null,
+          person_image_url: blankToNull($("avatarPersonUrl").value) || blankToNull($("personImageUrl").value),
+          audio_asset_id: narrationAsset?.asset_id || null,
+          audio_url: blankToNull($("avatarAudioUrl").value),
+          public_base_url: blankToNull($("publicBaseUrl").value),
+        };
+        if (!payload.person_image_asset_id && !payload.person_image_url) {
+          setStatus("需要人物图资产或 URL（点「生成人物图 / 上传人物图」，或填「数字人人物图 URL」）", "warn");
+          return;
+        }
+        if (!payload.audio_asset_id && !payload.audio_url) {
+          setStatus("需要服务商音频资产或音频 URL（点「生成口播音频」，或填「口播音频 URL」）", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("数字人任务入队中", "warn");
+        try {
+          await api(`/api/runs/${state.runId}/jobs/avatar-from-assets`, {
+            method: "POST",
+            body: payload,
+          });
+          await loadJobs(state.runId);
+          setStatus("数字人任务已入队", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function processLatestJob() {
+        const job = [...state.jobs]
+          .reverse()
+          .find((item) => !["completed", "cancelled"].includes(item.status));
+        if (!job) {
+          setStatus("没有可推进的任务", "warn");
+          return;
+        }
+        await processJob(job.job_id);
+      }
+
+      async function dispatchStageExecution() {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("派发就绪步骤中", "warn");
+        try {
+          const result = await runManifestAction({ action: "dispatch_ready_steps" });
+          const jobs = result.result_payload?.jobs || [];
+          await loadRun(state.runId);
+          setStatus(jobs.length ? `已派发 ${jobs.length} 个任务` : "暂无可派发步骤", jobs.length ? "good" : "warn");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function processJob(jobId) {
+        setWorkflowBusy(true);
+        setStatus("任务推进中", "warn");
+        try {
+          await runManifestAction({ action: "process_job", job_id: jobId });
+          await loadJobs(state.runId);
+          await loadRun(state.runId);
+          setStatus("任务状态已更新", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function retryJob(jobId) {
+        setWorkflowBusy(true);
+        setStatus("任务重试中", "warn");
+        try {
+          await runManifestAction({ action: "retry_job", job_id: jobId });
+          await loadJobs(state.runId);
+          setStatus("任务已重新入队", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function loadJobs(runId) {
+        const [jobs, dispatchPreview] = await Promise.all([
+          fetchJobs(runId),
+          fetchDispatchPreview(runId),
+        ]);
+        state.jobs = jobs;
+        state.dispatchPreview = dispatchPreview;
+        renderJobs();
+        renderExecution();
+      }
+
+      async function fetchJobs(runId) {
+        try {
+          return await api(`/api/runs/${runId}/jobs`);
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      async function fetchDispatchPreview(runId) {
+        try {
+          return await api(`/api/runs/${runId}/dispatch-stage-execution/preview`);
+        } catch (_error) {
+          return null;
+        }
+      }
+
+      async function fetchReviewRequests(runId) {
+        try {
+          return await api(`/api/runs/${runId}/review-requests`);
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      async function reviewCurrentStage(decision) {
+        if (!state.run || !state.run.current_stage_key) return;
+        const comment = $("reviewComment").value.trim() || null;
+        setStatus("提交中", "warn");
+        try {
+          await api(`/api/runs/${state.runId}/stages/${state.run.current_stage_key}/review`, {
+            method: "POST",
+            body: { decision, comment },
+          });
+          $("reviewComment").value = "";
+          await loadRun(state.runId);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function previewAsset(assetId) {
+        try {
+          const asset = state.assets.find((item) => item.asset_id === assetId);
+          const link = await api(`/api/assets/${assetId}/access-link`);
+          const preview = $("assetPreview");
+          preview.textContent = "";
+          const name = document.createElement("div");
+          name.className = "muted";
+          name.textContent = assetLabel(asset);
+          preview.appendChild(name);
+
+          if ((asset.mime_type || "").startsWith("video/")) {
+            const video = document.createElement("video");
+            video.controls = true;
+            video.src = link.url;
+            preview.appendChild(video);
+          } else if ((asset.mime_type || "").startsWith("audio/")) {
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            audio.src = link.url;
+            preview.appendChild(audio);
+          } else if ((asset.mime_type || "").startsWith("image/")) {
+            const image = document.createElement("img");
+            image.alt = assetLabel(asset);
+            image.src = link.url;
+            preview.appendChild(image);
+          }
+
+          const anchor = document.createElement("a");
+          anchor.href = link.url;
+          anchor.textContent = "打开资产";
+          anchor.target = "_blank";
+          anchor.rel = "noreferrer";
+          preview.appendChild(anchor);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      async function generatePersonImageForStep(step) {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("生成人物图中", "warn");
+        try {
+          const result = await runManifestAction({
+            action: "generate_person_image",
+            stage_key: step.stage_key || "asset_generation",
+            stage_run_id: stageRunId(step.stage_key) || stageRunId("asset_generation"),
+            manifest_step_key: step.manifest_step_key,
+            payload: {
+              prompt: avatarImagePrompt(),
+              filename: "workspace-generated-person.png",
+              negative_prompt:
+                "text, watermark, logo, extra fingers, distorted face, hidden mouth, side profile, low quality, blurry",
+              asset_metadata: {
+                mode: "workspace_repair",
+                role: "person_image",
+                source: "workspace_dispatch_repair",
+                manifest_step_key: step.manifest_step_key,
+                description: "工作台根据 manifest 缺失输入自动生成的数字人人物参考图",
+              },
+            },
+          });
+          await loadRun(state.runId);
+          await previewAsset(result.result_payload.asset.asset_id);
+          setStatus("人物图已生成", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function pickAndUploadReferenceImage(role, description, stageKey) {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        const file = await pickImageFile();
+        if (!file) return;
+        setWorkflowBusy(true);
+        setStatus("上传素材中", "warn");
+        try {
+          const result = await runManifestAction({
+            action: "upload_person_image",
+            stage_key: stageKey || "asset_generation",
+            stage_run_id: stageRunId(stageKey) || stageRunId("asset_generation"),
+            payload: {
+              role,
+              asset_type: "reference_image",
+              filename: file.name,
+              content_base64: await readFileBase64(file),
+              provider: "user_input",
+              tool_key: "workspace_reference_upload",
+              mime_type: file.type || "application/octet-stream",
+              asset_metadata: {
+                mode: "workspace_repair",
+                role,
+                source: "workspace_inline_upload",
+                description,
+              },
+            },
+          });
+          await loadRun(state.runId);
+          await previewAsset(result.result_payload.asset.asset_id);
+          setStatus("素材已上传", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      function pickImageFile() {
+        return new Promise((resolve) => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = "image/*";
+          input.addEventListener("change", () => resolve(input.files?.[0] || null), { once: true });
+          input.click();
+        });
+      }
+
+      async function generateTtsForStep(step) {
+        if (!state.runId) {
+          setStatus("请先加载一个 run", "warn");
+          return;
+        }
+        const text = spokenScriptText();
+        if (!text) {
+          setStatus("需要先生成 spoken_script", "warn");
+          return;
+        }
+        setWorkflowBusy(true);
+        setStatus("生成口播音频中", "warn");
+        try {
+          const result = await runManifestAction({
+            action: "generate_tts",
+            stage_key: step.stage_key || "asset_generation",
+            stage_run_id: stageRunId(step.stage_key) || stageRunId("asset_generation"),
+            manifest_step_key: step.manifest_step_key,
+            payload: {
+              segment_id: "full_script",
+              text,
+              voice: $("ttsVoice").value.trim() || "Cherry",
+              filename: "workspace-narration.wav",
+              asset_metadata: {
+                mode: "workspace_repair",
+                source_artifact_type: "spoken_script",
+                manifest_step_key: step.manifest_step_key,
+              },
+            },
+          });
+          await loadRun(state.runId);
+          await previewAsset(result.result_payload.asset.asset_id);
+          setStatus("口播音频已生成", "good");
+        } catch (error) {
+          setStatus(error.message, "bad");
+        } finally {
+          setWorkflowBusy(false);
+          renderWorkflow();
+        }
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          method: options.method || "GET",
+          headers: { "Content-Type": "application/json" },
+          body: options.body ? JSON.stringify(options.body) : undefined,
+        });
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+        if (!response.ok) {
+          const error = new Error(formatApiError(data?.detail, response));
+          error.detail = data?.detail ?? null;
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+
+      async function runManifestAction(body) {
+        if (!state.runId) {
+          throw new Error("请先加载一个 run");
+        }
+        return api(`/api/runs/${state.runId}/manifest-actions`, {
+          method: "POST",
+          body,
+        });
+      }
+
+      function render() {
+        renderSummary();
+        renderPlan();
+        renderExecution();
+        renderWorkflow();
+        renderStages();
+        renderReview();
+        renderGates();
+        renderArtifacts();
+        renderAssets();
+        renderJobs();
+        renderEvents();
+      }
+
+      function renderSummary() {
+        const run = state.run;
+        $("metricRun").textContent = run?.run_id || "-";
+        $("metricPipeline").textContent = pipelineLabel(run?.pipeline_key);
+        $("metricStage").textContent = stageLabel(run?.current_stage_key);
+        $("metricAssets").textContent = state.assets.length;
+        setBadge($("runStatusBadge"), statusLabel(run?.status), statusTone(run?.status));
+      }
+
+      function renderStages() {
+        const root = $("stageList");
+        root.textContent = "";
+        if (!state.run?.stages?.length) {
+          root.appendChild(empty("等待 run"));
+          return;
+        }
+        state.run.stages.forEach((stage) => {
+          const node = document.createElement("div");
+          node.className = `stage ${stage.stage_key === state.run.current_stage_key ? "active" : ""}`;
+          node.innerHTML = `
+            <div class="stage-top">
+              <div class="stage-name"></div>
+              <span class="badge ${statusTone(stage.status)}"></span>
+            </div>
+            <div class="muted"></div>
+          `;
+          node.querySelector(".stage-name").textContent = `${stage.order}. ${stageLabel(stage.stage_key)}`;
+          const badge = node.querySelector(".badge");
+          badge.textContent = statusLabel(stage.status);
+          node.querySelector(".muted").textContent =
+            (stage.output_artifact_types || []).map(artifactLabel).join(", ") || "-";
+          node.title = stage.stage_key;
+          root.appendChild(node);
+        });
+      }
+
+      function renderReview() {
+        const canReview = state.run?.status === "waiting_review" && state.run?.current_stage_key;
+        setBadge($("reviewBadge"), canReview ? stageLabel(state.run.current_stage_key) : "无待审", canReview ? "warn" : "");
+        document.querySelectorAll("[data-review]").forEach((button) => {
+          button.disabled = !canReview;
+        });
+        renderReviewRequestCard(canReview);
+      }
+
+      /** The request that the current gate belongs to, if one is still open. */
+      function currentReviewRequest() {
+        const requests = state.reviewRequests || [];
+        const open = requests.filter((item) => item.status === "open");
+        if (open.length) return open[open.length - 1];
+        return requests.length ? requests[requests.length - 1] : null;
+      }
+
+      function renderReviewRequestCard(canReview) {
+        const root = $("reviewRequestCard");
+        root.textContent = "";
+        const request = currentReviewRequest();
+        if (!request) {
+          root.appendChild(empty("暂无审核请求"));
+          return;
+        }
+        const scope = (request.artifact_scope || [])
+          .map((ref) => `${artifactLabel(ref.artifact_type)} v${ref.version}`)
+          .join(", ");
+        const rows = [
+          ["审核对象", scope || "-"],
+          ["通过后进入", stageLabel(request.gates_stage_key) || "-"],
+          ["轮次", `第 ${request.iteration} 轮`],
+          ["当前状态", reviewRequestStatusLabel(request)],
+          ["最近决定", request.current_decision ? reviewDecisionLabel(request.current_decision) : "-"],
+          ["审核人", request.assignee_user_id || "未指派"],
+          [
+            "截止时间",
+            request.due_at ? `${request.overdue ? "已逾期 " : ""}${formatDateTime(request.due_at)}` : "-",
+          ],
+          ["审核关注点", (request.review_focus || []).map(reviewFocusLabel).join(" · ") || "-"],
+          ["通过标准", (request.success_criteria || []).join(" · ") || "-"],
+        ];
+        rows.forEach(([label, value]) => {
+          const row = document.createElement("div");
+          row.className = "compact-row";
+          const name = document.createElement("div");
+          name.className = "muted";
+          name.textContent = label;
+          const body = document.createElement("div");
+          body.textContent = value;
+          row.appendChild(name);
+          row.appendChild(body);
+          row.appendChild(document.createElement("span"));
+          root.appendChild(row);
+        });
+        if (!canReview) {
+          const note = document.createElement("div");
+          note.className = "muted";
+          note.textContent = "当前 run 未处于待审核状态，无法在此提交决策。";
+          root.appendChild(note);
+        }
+      }
+
+      /**
+       * The gate checklist comes from the pipeline DSL snapshot pinned to the
+       * run, so it reflects the policy the run was actually executed under.
+       */
+      function renderGates() {
+        const root = $("gateList");
+        root.textContent = "";
+        const stages = state.run?.pipeline_definition_snapshot?.stages || [];
+        const stageRuns = new Map((state.run?.stages || []).map((item) => [item.stage_key, item]));
+        const gates = stages.filter(
+          (stage) =>
+            stage.requires_human_review ||
+            stage.review_policy?.required ||
+            stage.review_policy?.gate_type === "human_review",
+        );
+        setBadge($("gateCount"), gates.length, gates.length ? "info" : "");
+        if (!gates.length) {
+          $("nextGate").textContent = "该 pipeline 未声明审核关口";
+          root.appendChild(empty("暂无审核关口"));
+          return;
+        }
+
+        let nextGate = null;
+        gates.forEach((stage) => {
+          const run = stageRuns.get(stage.stage_key);
+          const status = run?.status || "pending";
+          const approved = status === "approved";
+          const invalidated = Boolean(run?.invalidation);
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = `
+            <div class="stage-top">
+              <div class="stage-name"></div>
+              <span class="badge"></span>
+            </div>
+            <div class="muted"></div>
+          `;
+          node.querySelector(".stage-name").textContent = `${run?.order ?? "-"}. ${stageLabel(stage.stage_key)}`;
+          const badge = node.querySelector(".badge");
+          badge.textContent = `${statusLabel(status)}${invalidated ? " · 已失效" : ""}`;
+          const tone = invalidated ? "bad" : statusTone(status);
+          if (tone) badge.classList.add(tone);
+          node.querySelector(".muted").textContent =
+            status === "waiting_review"
+              ? "等待人工审核"
+              : approved
+                ? "已通过审核"
+                : `关口类型 ${stage.review_policy?.gate_type || "human_review"}`;
+          node.title = stage.stage_key;
+          root.appendChild(node);
+
+          if (!nextGate && status !== "approved" && status !== "skipped") {
+            nextGate = { stage, status };
+          }
+        });
+
+        $("nextGate").textContent = nextGate
+          ? `下一道审核关口：${stageLabel(nextGate.stage.stage_key)}（${statusLabel(nextGate.status)}）`
+          : "全部审核关口已通过";
+      }
+
+      function renderPlan() {
+        const preflight = findArtifactByType("preflight_report");
+        const executionPlan = findArtifactByType("execution_plan");
+        const badgeText =
+          executionPlan?.payload?.execution_policy ||
+          preflight?.payload?.overall_status ||
+          "未预检";
+        setBadge($("planBadge"), executionPolicyLabel(badgeText), planTone(badgeText));
+        $("planPolicy").textContent = executionPolicyLabel(
+          executionPlan?.payload?.execution_policy || preflight?.payload?.overall_status,
+        );
+        $("planBlocked").textContent = String(
+          executionPlan?.payload?.blocking_issues?.length ||
+            preflight?.payload?.blocking_issues?.length ||
+            0,
+        );
+        $("planDecisionCount").textContent = String(executionPlan?.payload?.decision_log?.length || 0);
+
+        renderPlanIssues(executionPlan, preflight);
+        renderIntentDowngrades(executionPlan);
+        renderCostReservation(executionPlan);
+        renderPlanDecisions(executionPlan);
+      }
+
+      function renderCostReservation(executionPlan) {
+        const reservation = executionPlan?.payload?.cost_reservation;
+        if (!reservation) {
+          return;
+        }
+        const root = $("planIssueList");
+        const currency = reservation.currency || "USD";
+        const budgetText =
+          reservation.budget_limit === null || reservation.budget_limit === undefined
+            ? "未设置预算"
+            : `${reservation.budget_limit} ${currency}`;
+        root.appendChild(
+          compactRow(
+            "成本预留",
+            `预留 ${reservation.reserved_cost} ${currency} · 预算 ${budgetText}`,
+            `预算状态：${budgetStatusLabel(reservation.budget_status)}${
+              reservation.paid_providers?.length
+                ? ` · 付费 provider：${reservation.paid_providers.join(" / ")}`
+                : ""
+            }`,
+            reservation.budget_status === "exceeds_budget" ? "bad" : "warn",
+          ),
+        );
+        const consents = state.run?.input_payload?.paid_provider_consents || {};
+        (reservation.paid_providers || [])
+          .filter((provider) => !consents[provider])
+          .forEach((provider) => {
+            root.appendChild(paidConsentRow(provider, reservation));
+          });
+      }
+
+      function paidConsentRow(provider, reservation) {
+        const node = document.createElement("div");
+        node.className = "compact-row";
+        const cost = (reservation.paid_tools || [])
+          .filter((item) => item.provider === provider)
+          .reduce((sum, item) => sum + Number(item.estimated_cost || 0), 0);
+        node.innerHTML = `
+          <div class="muted"></div>
+          <div>
+            <div class="item-name"></div>
+            <div class="muted compact-detail"></div>
+          </div>
+          <button type="button" class="badge warn action"></button>
+        `;
+        node.querySelector(".compact-row > .muted").textContent = "首次付费";
+        node.querySelector(".item-name").textContent = provider;
+        node.querySelector(".compact-detail").textContent =
+          `首次调用付费 provider ${provider} 需要人工确认（预计 ${cost.toFixed(2)} ${reservation.currency || "USD"}）`;
+        const button = node.querySelector("button");
+        button.textContent = "确认付费";
+        button.addEventListener("click", () => confirmPaidProvider(provider));
+        return node;
+      }
+
+      async function confirmPaidProvider(provider) {
+        if (!state.runId) {
+          return;
+        }
+        try {
+          await api(`/api/runs/${state.runId}/provider-consents`, {
+            method: "POST",
+            body: { provider, accept: true },
+          });
+          setStatus(`已确认付费 provider ${provider}`, "good");
+          await loadRun(state.runId);
+        } catch (error) {
+          setStatus(error.message, "bad");
+        }
+      }
+
+      function budgetStatusLabel(status) {
+        return (
+          {
+            within_budget: "在预算内",
+            exceeds_budget: "超出预算",
+            not_configured: "未设置预算",
+          }[status] ||
+          status ||
+          "-"
+        );
+      }
+
+      function renderIntentDowngrades(executionPlan) {
+        const downgrades = executionPlan?.payload?.intent_downgrades || [];
+        if (!downgrades.length) {
+          return;
+        }
+        const root = $("planIssueList");
+        const declaredMode = executionPlan?.payload?.run_input?.quality_mode || "-";
+        root.appendChild(
+          compactRow(
+            "质量降级",
+            (executionPlan?.payload?.intent_downgrade_capabilities || [])
+              .map((key) => capabilityLabel(key) || key)
+              .join(" / ") || "已声明意图",
+            `声明的质量模式 ${declaredMode} 无法满足，启动前需要确认`,
+            "warn",
+          ),
+        );
+        downgrades.slice(0, 4).forEach((item) => {
+          const outcome =
+            item.kind === "capability_missing"
+              ? "该能力没有可用工具，会被跳过"
+              : `改用 ${item.selected_tool_key || "未知工具"}（${item.expected_runtime} → ${item.selected_runtime || "local"}）`;
+          root.appendChild(
+            compactRow(
+              stageOrScopeLabel(item.stage_key),
+              capabilityLabel(item.capability) || item.capability,
+              outcome,
+              "warn",
+            ),
+          );
+        });
+      }
+
+      function renderPlanIssues(executionPlan, preflight) {
+        const root = $("planIssueList");
+        root.textContent = "";
+        const issues =
+          executionPlan?.payload?.blocking_issues ||
+          preflight?.payload?.blocking_issues ||
+          [];
+        const recommendations =
+          executionPlan?.payload?.recommendations ||
+          preflight?.payload?.recommendations ||
+          [];
+        if (!issues.length && !recommendations.length) {
+          root.appendChild(empty(executionPlan || preflight ? "无阻塞项" : "暂无检查结果"));
+          return;
+        }
+        issues.slice(0, 4).forEach((issue) => {
+          root.appendChild(
+            compactRow(
+              stageOrScopeLabel(issue.stage_key || issue.scope || "pipeline"),
+              capabilityLabel(issue.capability) || "问题",
+              formatIssueDetail(issue),
+              "bad",
+            ),
+          );
+        });
+        recommendations.slice(0, 4).forEach((recommendation) => {
+          root.appendChild(
+            compactRow(
+              priorityLabel(recommendation.priority) || "建议",
+              capabilityLabel(recommendation.capability) || actionLabel(recommendation.action),
+              [
+                actionLabel(recommendation.action),
+                formatDependencies(recommendation.missing_dependencies),
+                formatToolList(recommendation.fallback_tool_keys),
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              recommendation.priority === "high" ? "bad" : "warn",
+            ),
+          );
+        });
+      }
+
+      function renderPlanDecisions(executionPlan) {
+        const root = $("planDecisionList");
+        root.textContent = "";
+        const decisions = executionPlan?.payload?.decision_log || [];
+        if (!decisions.length) return;
+        decisions.slice(0, 6).forEach((decision) => {
+          root.appendChild(
+            compactRow(
+              stageLabel(decision.stage_key),
+              toolLabel(decision.selected_tool_key) || decisionLabel(decision.decision),
+              [
+                capabilityLabel(decision.capability),
+                providerLabel(decision.selected_provider),
+                decision.required ? "必需" : "可选",
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              decisionTone(decision.decision),
+            ),
+          );
+        });
+      }
+
+      function renderExecution() {
+        const manifest = findArtifactByType("stage_execution_manifest");
+        const preview = state.dispatchPreview;
+        const root = $("executionStepList");
+        root.textContent = "";
+        if (!manifest) {
+          setBadge($("executionBadge"), "未生成", "");
+          $("executionTaskCount").textContent = "0";
+          $("executionStepCount").textContent = "0";
+          $("executionJobCount").textContent = "0";
+          root.appendChild(empty("暂无执行清单"));
+          return;
+        }
+
+        const steps = preview?.steps || [];
+        const summary = preview?.summary || {};
+        const readySteps = summary.dispatchable_steps || 0;
+        const resolvedSteps = (summary.completed_steps || 0) + (summary.existing_output_steps || 0);
+        setBadge(
+          $("executionBadge"),
+          readySteps ? `${readySteps} 可派发` : `${resolvedSteps}/${summary.total_steps || steps.length}`,
+          steps.length && resolvedSteps === steps.length ? "good" : steps.length ? "warn" : "",
+        );
+        $("executionTaskCount").textContent = String((manifest.payload?.stage_tasks || []).length);
+        $("executionStepCount").textContent = String(summary.total_steps || steps.length);
+        $("executionJobCount").textContent = String(summary.queued_steps || 0);
+
+        if (!steps.length) {
+          root.appendChild(empty(preview?.reason || "没有自动派发步骤"));
+          return;
+        }
+        steps.forEach((step) => {
+          root.appendChild(executionStepRow(step));
+        });
+      }
+
+      function executionStepRow(step) {
+        const detail = [
+          capabilityLabel(step.capability),
+          toolLabel(step.tool_key),
+          step.job?.job_id,
+          messageLabel(step.reason),
+          errorBrief(step.job),
+          readableMissingInputs(step.missing_inputs),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const node = document.createElement("div");
+        node.className = "compact-row";
+        node.innerHTML = `
+          <div class="muted"></div>
+          <div>
+            <div class="item-name"></div>
+            <div class="muted compact-detail"></div>
+            <div class="error-help"></div>
+            <div class="execution-actions"></div>
+          </div>
+          <span class="badge"></span>
+        `;
+        node.querySelector(".compact-row > .muted").textContent = stageLabel(step.stage_key);
+        node.querySelector(".item-name").textContent = executionStepLabel(step);
+        node.querySelector(".compact-detail").textContent = detail || "";
+        node.title = [step.tool_step_id, step.stage_key, step.capability].filter(Boolean).join(" · ");
+        const help = node.querySelector(".error-help");
+        const helpText = formatErrorHelp(step.job);
+        if (helpText) {
+          help.textContent = helpText;
+        } else {
+          help.remove();
+        }
+        const badge = node.querySelector(".badge");
+        badge.className = `badge ${executionTone(step.status)}`;
+        badge.textContent = dispatchStatusLabel(step);
+
+        const actions = node.querySelector(".execution-actions");
+        const buttons = executionStepActions(step);
+        if (!buttons.length) {
+          actions.remove();
+          return node;
+        }
+        buttons.forEach((action) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = action.label;
+          button.addEventListener("click", action.run);
+          actions.appendChild(button);
+        });
+        return node;
+      }
+
+      function executionStepActions(step) {
+        const actions = [];
+        const missingInputs = new Set(step.missing_inputs || []);
+        const outputAssetId = (step.output_asset_ids || [])[0];
+        if (step.dispatchable || step.status === "ready") {
+          actions.push({ label: "派发", run: dispatchStageExecution });
+        }
+        if (missingInputs.has("person_image")) {
+          actions.push({
+            label: "生成人物图",
+            run: () => generatePersonImageForStep(step),
+          });
+          actions.push({
+            label: "上传人物图",
+            run: () => pickAndUploadReferenceImage("person_image", "数字人口播人物参考", step.stage_key),
+          });
+        }
+        if (missingInputs.has("tts_audio")) {
+          actions.push({ label: "生成口播音频", run: () => generateTtsForStep(step) });
+        }
+        if (outputAssetId) {
+          actions.push({ label: "预览产物", run: () => previewAsset(outputAssetId) });
+        }
+        if (step.job && !["completed", "cancelled", "failed"].includes(step.job.status)) {
+          actions.push({ label: "推进任务", run: () => processJob(step.job.job_id) });
+        }
+        if (step.job && step.job.status === "failed" && step.job.attempt < step.job.max_attempts) {
+          actions.push({ label: "重试任务", run: () => retryJob(step.job.job_id) });
+        }
+        if (step.status === "waiting_stage" && state.run?.status === "waiting_review") {
+          actions.push({ label: "去审核", run: focusReviewPanel });
+        }
+        return actions;
+      }
+
+      function renderArtifacts() {
+        const tabs = $("artifactTabs");
+        tabs.textContent = "";
+        if (!state.artifacts.length) {
+          $("artifactPayload").textContent = "{}";
+          return;
+        }
+        state.artifacts.forEach((artifact) => {
+          const button = document.createElement("button");
+          button.className = `tab ${artifact.artifact_id === state.selectedArtifactId ? "active" : ""}`;
+          button.type = "button";
+          button.textContent = `${artifactLabel(artifact.artifact_type)} v${artifact.version}`;
+          button.title = artifact.artifact_type;
+          button.addEventListener("click", () => {
+            state.selectedArtifactId = artifact.artifact_id;
+            renderArtifacts();
+          });
+          tabs.appendChild(button);
+        });
+        const selected =
+          state.artifacts.find((artifact) => artifact.artifact_id === state.selectedArtifactId) ||
+          state.artifacts[state.artifacts.length - 1];
+        $("artifactPayload").textContent = JSON.stringify(selected, null, 2);
+      }
+
+      function renderAssets() {
+        const root = $("assetList");
+        root.textContent = "";
+        $("assetCount").textContent = String(state.assets.length);
+        if (!state.assets.length) {
+          root.appendChild(empty("暂无资产"));
+          $("assetPreview").textContent = "";
+          return;
+        }
+        state.assets.forEach((asset) => {
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = `
+            <div class="item-top">
+              <div class="item-name"></div>
+              <button type="button">预览</button>
+            </div>
+            <div class="muted"></div>
+          `;
+          node.querySelector(".item-name").textContent = assetLabel(asset);
+          node.querySelector(".muted").textContent = [
+            assetTypeLabel(asset.asset_type),
+            asset.mime_type,
+            providerLabel(asset.provider),
+            formatBytes(asset.file_size),
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          node.querySelector("button").addEventListener("click", () => previewAsset(asset.asset_id));
+          root.appendChild(node);
+        });
+      }
+
+      function renderEvents() {
+        const root = $("eventList");
+        root.textContent = "";
+        $("eventCount").textContent = String(state.events.length);
+        if (!state.events.length) {
+          root.appendChild(empty("暂无事件"));
+          return;
+        }
+        [...state.events].reverse().slice(0, 20).forEach((event) => {
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = `
+            <div class="item-top">
+              <div class="item-name"></div>
+              <span class="badge"></span>
+            </div>
+            <div class="muted"></div>
+          `;
+          node.querySelector(".item-name").textContent = eventLabel(event.event_type);
+          node.querySelector(".badge").textContent = `#${event.sequence}`;
+          node.querySelector(".muted").textContent = [stageLabel(event.stage_key), messageLabel(event.message)]
+            .filter(Boolean)
+            .join(" · ");
+          node.title = event.event_type;
+          root.appendChild(node);
+        });
+      }
+
+      function renderWorkflow() {
+        const hasRun = Boolean(state.runId);
+        const renderAsset = findRenderAsset();
+        setBadge(
+          $("workflowBadge"),
+          renderAsset ? "有成片" : hasRun ? "可生成" : "待命",
+          renderAsset ? "good" : hasRun ? "warn" : "",
+        );
+        [
+          "runPreflightButton",
+          "buildExecutionPlanButton",
+          "startRunButton",
+          "dispatchExecutionButton",
+          "rerunLocalButton",
+          "rerunProviderButton",
+          "rerunAvatarButton",
+          "refreshFinalLinkButton",
+          "generatePersonImageButton",
+          "uploadPersonImageButton",
+          "enqueueAvatarJobButton",
+        ]
+          .map((id) => $(id))
+          .forEach((button) => {
+            button.disabled = !hasRun;
+          });
+      }
+
+      function renderJobs() {
+        const root = $("jobList");
+        root.textContent = "";
+        if (!state.jobs.length) {
+          root.appendChild(empty("暂无任务"));
+          return;
+        }
+        [...state.jobs].reverse().forEach((job) => {
+          const node = document.createElement("div");
+          node.className = "item";
+          node.innerHTML = `
+            <div class="item-top">
+              <div class="item-name"></div>
+              <span class="badge"></span>
+            </div>
+            <div class="muted"></div>
+            <div class="error-help"></div>
+            <div class="action-row" style="margin-top: 8px">
+              <button type="button" data-job-action="process">推进</button>
+              <button type="button" data-job-action="retry">重试</button>
+            </div>
+          `;
+          node.querySelector(".item-name").textContent = `${jobTypeLabel(job.job_type)} · ${job.job_id}`;
+          const badge = node.querySelector(".badge");
+          badge.textContent = `${statusLabel(job.status)} ${job.progress}%`;
+          badge.className = `badge ${statusTone(job.status)}`;
+          node.querySelector(".muted").textContent = [
+            `第 ${job.attempt}/${job.max_attempts} 次`,
+            job.error_category ? `错误类别 ${errorCategoryLabel(job.error_category)}` : "",
+            job.error_taxonomy_code,
+            job.error_message,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const help = node.querySelector(".error-help");
+          const helpText = formatErrorHelp(job);
+          if (helpText) {
+            help.textContent = helpText;
+          } else {
+            help.remove();
+          }
+          const finalVideoUrl = job.result_payload?.final_video_url;
+          if (finalVideoUrl) {
+            const anchor = document.createElement("a");
+            anchor.href = finalVideoUrl;
+            anchor.target = "_blank";
+            anchor.rel = "noreferrer";
+            anchor.textContent = "打开任务成片";
+            node.appendChild(anchor);
+          }
+          const processButton = node.querySelector('[data-job-action="process"]');
+          processButton.disabled = ["completed", "cancelled", "failed"].includes(job.status);
+          processButton.addEventListener("click", () => processJob(job.job_id));
+          const retryButton = node.querySelector('[data-job-action="retry"]');
+          retryButton.disabled = job.status !== "failed" || job.attempt >= job.max_attempts;
+          retryButton.addEventListener("click", () => retryJob(job.job_id));
+          root.appendChild(node);
+        });
+      }
+
+      function renderFinalLink(url, asset = null) {
+        const root = $("finalLinkPreview");
+        root.textContent = "";
+        if (!url) return;
+        const name = document.createElement("div");
+        name.className = "muted";
+        name.textContent = asset ? assetLabel(asset) : "最终成片";
+        root.appendChild(name);
+        if ((asset?.mime_type || "").startsWith("video/")) {
+          const video = document.createElement("video");
+          video.controls = true;
+          video.src = url;
+          root.appendChild(video);
+        }
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.target = "_blank";
+        anchor.rel = "noreferrer";
+        anchor.textContent = "打开成片链接";
+        root.appendChild(anchor);
+      }
+
+      async function referenceFromInputs(fileId, urlId, description) {
+        const file = $(fileId).files?.[0];
+        if (file) {
+          return {
+            filename: file.name,
+            content_base64: await readFileBase64(file),
+            mime_type: file.type || "application/octet-stream",
+            description,
+          };
+        }
+        const url = blankToNull($(urlId).value);
+        return url ? { url, description } : null;
+      }
+
+      function readFileBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = String(reader.result || "");
+            resolve(result.includes(",") ? result.split(",").pop() : result);
+          };
+          reader.onerror = () => reject(new Error("素材文件读取失败"));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function findRenderAsset() {
+        const packageArtifact = [...state.artifacts]
+          .reverse()
+          .find((artifact) => artifact.artifact_type === "publish_package");
+        const renderAssetId = packageArtifact?.payload?.render_asset_id;
+        return (
+          [...state.assets].reverse().find((asset) => asset.asset_type === "rendered_video") ||
+          state.assets.find((asset) => asset.asset_id === renderAssetId) ||
+          null
+        );
+      }
+
+      function findReferenceAsset(role) {
+        return (
+          [...state.assets]
+            .reverse()
+            .find((asset) => asset.asset_type === "reference_image" && asset.asset_metadata?.role === role) ||
+          null
+        );
+      }
+
+      function findAssetByType(assetType) {
+        return [...state.assets].reverse().find((asset) => asset.asset_type === assetType) || null;
+      }
+
+      function findArtifactByType(artifactType) {
+        return (
+          [...state.artifacts]
+            .reverse()
+            .find((artifact) => artifact.artifact_type === artifactType && artifact.is_current !== false) ||
+          null
+        );
+      }
+
+      function stageRunId(stageKey) {
+        return state.run?.stages?.find((stage) => stage.stage_key === stageKey)?.stage_run_id || null;
+      }
+
+      function spokenScriptText() {
+        const spokenScript = findArtifactByType("spoken_script")?.payload || {};
+        const fullText = String(spokenScript.full_text || "").trim();
+        const text =
+          fullText ||
+          (spokenScript.segments || [])
+            .map((segment) => String(segment.text || segment.caption || "").trim())
+            .filter(Boolean)
+            .join(" ");
+        return text.length > 600 ? `${text.slice(0, 597).trim()}...` : text;
+      }
+
+      function avatarImagePrompt() {
+        const input = state.run?.input_payload || {};
+        const brand = input.brand_name || $("brandName").value.trim() || "奶茶品牌";
+        const product = input.product_name || $("productName").value.trim() || "冲泡奶茶";
+        const scriptHint = spokenScriptText().slice(0, 120);
+        return [
+          "Photorealistic portrait for AI talking-avatar video.",
+          "One Chinese female college student in a cozy dorm room, wearing a soft knit cardigan, seated at a desk.",
+          "Front-facing upper body, mouth clearly visible, natural friendly smile, centered face, balanced lighting.",
+          `Product context: ${brand} ${product}.`,
+          scriptHint ? `Script mood: ${scriptHint}.` : "",
+          "Warm autumn milk tea ad feeling, clean background, no text, no logo, no watermark, high detail.",
+        ]
+          .filter(Boolean)
+          .join(" ");
+      }
+
+      function readableMissingInputs(inputs = []) {
+        const names = {
+          person_image: "人物图",
+          tts_audio: "口播音频",
+          spoken_script: "口播脚本",
+          avatar_video_clip: "数字人视频",
+          rendered_video: "渲染成片",
+          source_media: "源素材",
+          source_video: "源视频",
+          media_analysis_report: "素材分析报告",
+          clip_candidate_list: "候选片段",
+          clip_export_manifest: "短视频导出清单",
+          recording_plan: "录制方案",
+          screen_capture_manifest: "屏幕录制清单",
+          interaction_annotation_plan: "交互标注方案",
+          localization_plan: "本地化方案",
+          dubbing_manifest: "配音清单",
+          story_outline: "故事大纲",
+        };
+        return inputs.map((input) => names[input] || artifactLabel(input) || humanizeKey(input)).join(", ");
+      }
+
+      function focusReviewPanel() {
+        $("reviewComment").scrollIntoView({ behavior: "smooth", block: "center" });
+        $("reviewComment").focus();
+      }
+
+      function setWorkflowBusy(isBusy) {
+        [
+          "createSampleButton",
+          "runPreflightButton",
+          "buildExecutionPlanButton",
+          "startRunButton",
+          "dispatchExecutionButton",
+	          "rerunLocalButton",
+	          "rerunProviderButton",
+	          "rerunAvatarButton",
+	          "refreshFinalLinkButton",
+          "enqueueAvatarJobButton",
+          "generatePersonImageButton",
+          "uploadPersonImageButton",
+          "processLatestJobButton",
+          "refreshJobsButton",
+        ]
+          .map((id) => $(id))
+          .forEach((button) => {
+            button.disabled = isBusy;
+          });
+        document.querySelectorAll(".execution-actions button").forEach((button) => {
+          button.disabled = isBusy;
+        });
+      }
+
+      function setStatus(text, tone = "") {
+        const target = $("statusLine");
+        target.textContent = text;
+        target.style.color =
+          tone === "bad" ? "var(--bad)" : tone === "warn" ? "var(--warn)" : "var(--muted)";
+      }
+
+      function setBadge(node, text, tone = "") {
+        node.className = `badge ${tone}`;
+        node.textContent = text;
+      }
+
+      function labelFrom(group, key) {
+        if (!key) return "";
+        return labels[group]?.[key] || humanizeKey(key);
+      }
+
+      function pipelineLabel(key) {
+        return labelFrom("pipelines", key) || "-";
+      }
+
+      function stageLabel(key) {
+        return labelFrom("stages", key) || "-";
+      }
+
+      function stageOrScopeLabel(key) {
+        if (key === "pipeline") return "流程";
+        return stageLabel(key);
+      }
+
+      function artifactLabel(key) {
+        return labelFrom("artifacts", key) || "-";
+      }
+
+      function capabilityLabel(key) {
+        return labelFrom("capabilities", key);
+      }
+
+      function statusLabel(key) {
+        return labelFrom("statuses", key) || "-";
+      }
+
+      function reviewStatusLabel(key) {
+        return labelFrom("reviewStatuses", key) || labelFrom("statuses", key) || "-";
+      }
+
+      function reviewDecisionLabel(key) {
+        return labelFrom("reviewDecisions", key) || "-";
+      }
+
+      // Both `approve` and `approve_with_changes` close a request as approved;
+      // the decision is what distinguishes them for a human reader.
+      function reviewRequestStatusLabel(request) {
+        if (request.status === "approved" && request.current_decision === "approve_with_changes") {
+          return "已通过（带修改）";
+        }
+        if (request.status === "open" && request.current_decision === "reopen") {
+          return "已重新打开";
+        }
+        return reviewStatusLabel(request.status);
+      }
+
+      function reviewFocusLabel(key) {
+        return labelFrom("reviewFocus", key) || key;
+      }
+
+      function formatDateTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function executionPolicyLabel(key) {
+        return labelFrom("executionPolicies", key) || "-";
+      }
+
+      function decisionLabel(key) {
+        return labelFrom("decisions", key) || "-";
+      }
+
+      function providerLabel(key) {
+        return labelFrom("providers", key);
+      }
+
+      function toolLabel(key) {
+        return labelFrom("tools", key);
+      }
+
+      function assetTypeLabel(key) {
+        return labelFrom("assets", key);
+      }
+
+      function eventLabel(key) {
+        return labelFrom("events", key) || "-";
+      }
+
+      function actionLabel(key) {
+        return labelFrom("actions", key);
+      }
+
+      function priorityLabel(key) {
+        return labelFrom("priorities", key);
+      }
+
+      function errorCategoryLabel(key) {
+        return labelFrom("errorCategories", key);
+      }
+
+      function messageLabel(message) {
+        if (!message) return "";
+        return labels.messages[message] || message;
+      }
+
+      function jobTypeLabel(key) {
+        const jobTypes = {
+          avatar_from_assets: "数字人生成",
+          compose_video: "视频合成",
+          stage_tool_step: "执行步骤",
+          generate_tts: "语音生成",
+          generate_music: "音乐生成",
+          generate_image: "图片生成",
+          generate_subtitle: "字幕生成",
+        };
+        return jobTypes[key] || humanizeKey(key);
+      }
+
+      function executionStepLabel(step) {
+        if (step.stage_key && step.capability) {
+          return `${stageLabel(step.stage_key)} · ${capabilityLabel(step.capability)}`;
+        }
+        if (step.capability) return capabilityLabel(step.capability);
+        return humanizeKey(step.tool_step_id) || "-";
+      }
+
+      function formatIssueDetail(issue) {
+        return (
+          formatDependencies(issue.missing_dependencies) ||
+          messageLabel(issue.message) ||
+          ""
+        );
+      }
+
+      function formatDependencies(dependencies = []) {
+        return (dependencies || []).map(dependencyLabel).filter(Boolean).join(", ");
+      }
+
+      function dependencyLabel(value) {
+        if (!value) return "";
+        if (value.startsWith("env:")) return `环境变量 ${value.slice(4)}`;
+        if (value.startsWith("binary:")) return `本地命令 ${value.slice(7)}`;
+        if (value.startsWith("provider_disabled:")) {
+          return `服务商已禁用：${providerLabel(value.slice(18))}`;
+        }
+        return humanizeKey(value);
+      }
+
+      function formatToolList(toolKeys = []) {
+        return (toolKeys || []).map(toolLabel).filter(Boolean).join(", ");
+      }
+
+      function humanizeKey(value) {
+        if (!value) return "";
+        return String(value)
+          .replace(/^stage_/, "")
+          .replace(/^run_/, "")
+          .replace(/^job_/, "")
+          .split(/[._-]+/)
+          .filter(Boolean)
+          .map((part) => labels.capabilities[part] || labels.statuses[part] || part)
+          .join(" ");
+      }
+
+      function statusTone(status) {
+        if (["completed", "approved", "succeeded", "archived"].includes(status)) return "good";
+        if (["waiting_review", "waiting_provider", "running", "submitted", "queued"].includes(status))
+          return "warn";
+        if (["failed", "rejected", "cancelled"].includes(status)) return "bad";
+        return "";
+      }
+
+      function planTone(status) {
+        if (["ready", "proceed"].includes(status)) return "good";
+        if (["degraded", "proceed_with_degradations"].includes(status)) return "warn";
+        if (["blocked"].includes(status)) return "bad";
+        return "";
+      }
+
+      function decisionTone(decision) {
+        if (decision === "blocked") return "bad";
+        if (["use_degraded_tool", "skip_optional"].includes(decision)) return "warn";
+        if (decision === "use_tool") return "good";
+        return "";
+      }
+
+      function executionTone(status) {
+        if (["completed", "succeeded", "archived", "ready", "existing_output"].includes(status)) return "good";
+        if (["failed", "rejected", "cancelled"].includes(status)) return "bad";
+        if (["queued", "running", "waiting_provider", "waiting_stage", "waiting_input", "blocked"].includes(status))
+          return "warn";
+        return "";
+      }
+
+      function dispatchStatusLabel(step) {
+        if (step.job) return `${statusLabel(step.job.status)} ${step.job.progress}%`;
+        if (step.status === "ready") return "可派发";
+        if (step.status === "existing_output") return "已有产物";
+        if (step.status === "waiting_stage") return "等待阶段";
+        if (step.status === "waiting_input") return "等待输入";
+        if (step.status === "blocked") return "阻塞";
+        if (step.status === "unsupported") return "不支持";
+        return statusLabel(step.status);
+      }
+
+      function compactRow(left, main, detail, tone = "", badgeText = null) {
+        const node = document.createElement("div");
+        node.className = "compact-row";
+        node.innerHTML = `
+          <div class="muted"></div>
+          <div>
+            <div class="item-name"></div>
+            <div class="muted compact-detail"></div>
+          </div>
+          <span class="badge"></span>
+        `;
+        node.querySelector(".compact-row > .muted").textContent = left || "-";
+        node.querySelector(".item-name").textContent = main || "-";
+        node.querySelector(".compact-detail").textContent = detail || "";
+        const badge = node.querySelector(".badge");
+        badge.className = `badge ${tone}`;
+        badge.textContent = badgeText || tone || "-";
+        return node;
+      }
+
+      function assetLabel(asset) {
+        return asset?.asset_metadata?.filename || asset?.asset_id || "-";
+      }
+
+      function formatBytes(value) {
+        if (!value) return "";
+        if (value < 1024) return `${value} B`;
+        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${(value / 1024 / 1024).toFixed(1)} MB`;
+      }
+
+      function formatApiError(detail, response) {
+        if (!detail) return `${response.status} ${response.statusText}`;
+        if (typeof detail === "string") return detail;
+        return [
+          detail.message,
+          detail.error_user_message,
+          detail.error_remediation,
+          detail.error_category ? `错误类别 ${errorCategoryLabel(detail.error_category)}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      }
+
+      function errorBrief(errorSource) {
+        if (!errorSource) return "";
+        return [
+          errorSource.error_category ? `错误类别 ${errorCategoryLabel(errorSource.error_category)}` : "",
+          errorSource.error_taxonomy_code,
+          errorSource.error_user_message || errorSource.error_message,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      }
+
+      function formatErrorHelp(errorSource) {
+        if (!errorSource) return "";
+        const message = errorSource.error_user_message || errorSource.error_message;
+        const remediation = errorSource.error_remediation;
+        if (!message && !remediation) return "";
+        return [
+          message ? `提示：${message}` : "",
+          remediation ? `建议：${remediation}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+      }
+
+      function blankToNull(value) {
+        const text = String(value || "").trim();
+        return text || null;
+      }
+
+      function empty(text) {
+        const node = document.createElement("div");
+        node.className = "empty";
+        node.textContent = text;
+        return node;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const initialRunId = params.get("run_id");
+      if (initialRunId) {
+        $("runIdInput").value = initialRunId;
+        loadRun(initialRunId);
+      } else {
+        render();
+      }
+    </script>
+  </body>
+</html>

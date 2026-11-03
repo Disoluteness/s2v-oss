@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio Run Board</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0 12px;
+      }
+
+      button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      button.danger {
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        height: 36px;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0 10px;
+      }
+
+      textarea {
+        height: auto;
+        min-height: 72px;
+        padding: 8px 10px;
+        resize: vertical;
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(180px, 280px) minmax(260px, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.92);
+        position: sticky;
+        top: 0;
+        z-index: 3;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .brand a {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .run-form {
+        display: grid;
+        grid-template-columns: minmax(160px, 1fr) auto auto;
+        gap: 8px;
+      }
+
+      .status-line {
+        color: var(--muted);
+        text-align: right;
+      }
+
+      .status-line.warn {
+        color: var(--amber);
+      }
+
+      .status-line.error {
+        color: var(--red);
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        background: #fff;
+      }
+
+      .metric {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--panel);
+        min-width: 0;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 20px;
+        line-height: 1.1;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+        gap: 16px;
+        padding: 16px;
+        min-width: 0;
+      }
+
+      .column {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        overflow: hidden;
+        min-width: 0;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-header h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .lane-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+      }
+
+      .lane,
+      .item {
+        display: grid;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 10px;
+        min-width: 0;
+      }
+
+      .lane.current {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .item-title {
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 24px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: #fff;
+        padding: 2px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .pill.good {
+        color: var(--green);
+        border-color: #a9e2be;
+        background: var(--green-soft);
+      }
+
+      .pill.warn {
+        color: var(--amber);
+        border-color: #f0c77c;
+        background: var(--amber-soft);
+      }
+
+      .pill.bad {
+        color: var(--red);
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+      }
+
+      .pill.info {
+        color: var(--blue);
+        border-color: #b5ccff;
+        background: var(--blue-soft);
+      }
+
+      .pill.purple {
+        color: var(--purple);
+        border-color: #c9befa;
+        background: var(--purple-soft);
+      }
+
+      .lane.invalidated {
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+      }
+
+      .review-card {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 12px;
+      }
+
+      .review-snapshot {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+
+      .review-snapshot div strong {
+        display: block;
+        margin-top: 2px;
+        overflow-wrap: anywhere;
+      }
+
+      .focus-list {
+        margin: 4px 0 0;
+        padding-left: 18px;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .focus-list li {
+        overflow-wrap: anywhere;
+      }
+
+      .severity-critical {
+        color: var(--red);
+        font-weight: 700;
+      }
+
+      .severity-suggestion {
+        color: var(--amber);
+      }
+
+      .severity-nitpick {
+        color: var(--muted);
+      }
+
+      .comment-item {
+        border-left: 3px solid var(--border);
+        padding-left: 9px;
+      }
+
+      .comment-item.critical {
+        border-left-color: var(--red);
+      }
+
+      .comment-item.suggestion {
+        border-left-color: #f0c77c;
+      }
+
+      .decision-item {
+        display: grid;
+        gap: 4px;
+        border-left: 3px solid var(--purple);
+        padding-left: 9px;
+      }
+
+      .timeline,
+      .stack {
+        display: grid;
+        gap: 8px;
+      }
+
+      .output-preview {
+        display: grid;
+        gap: 10px;
+      }
+
+      video,
+      audio,
+      img,
+      iframe {
+        width: 100%;
+        max-height: 360px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #101828;
+      }
+
+      iframe {
+        min-height: 320px;
+        background: #fff;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        background: var(--panel-soft);
+        font-size: 12px;
+      }
+
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 22px 12px;
+      }
+
+      pre {
+        margin: 0;
+        max-height: 360px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #111827;
+        color: #e5e7eb;
+        padding: 10px;
+        font-size: 12px;
+      }
+
+      @media (max-width: 1180px) {
+        .summary {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar {
+          grid-template-columns: 1fr;
+        }
+
+        .run-form {
+          grid-template-columns: 1fr;
+        }
+
+        .status-line {
+          text-align: left;
+        }
+
+        .summary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span>Run Board</span>
+          <a href="/dashboard">项目仪表盘</a>
+          <a id="workspaceLink" href="/workspace">工作台</a>
+        </div>
+        <form id="runForm" class="run-form">
+          <input id="runIdInput" name="run_id" placeholder="run_id" autocomplete="off" />
+          <button class="primary" type="submit">加载</button>
+          <button id="refreshButton" type="button">刷新</button>
+        </form>
+        <div id="statusLine" class="status-line">未加载</div>
+      </header>
+
+      <section id="summaryGrid" class="summary"></section>
+
+      <main class="layout">
+        <section class="column">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>阶段泳道</h2>
+              <span id="stageCount" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="stageLanes" class="lane-grid"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>审核</h2>
+              <span id="reviewCount" class="pill warn">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="currentReview" class="stack"></div>
+              <div id="reviewComments" class="stack"></div>
+              <div id="reviewActionItems" class="stack"></div>
+              <div id="reviewTimeline" class="timeline"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>产物时间线</h2>
+              <span id="artifactCount" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="artifactTimeline" class="timeline"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>成片预览与版本</h2>
+              <span id="outputCount" class="pill">0</span>
+            </div>
+            <div class="panel-body output-preview">
+              <div id="primaryPreview"></div>
+              <div id="versionGroups" class="stack"></div>
+            </div>
+          </section>
+        </section>
+
+        <aside class="column">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>输入缺口与修复动作</h2>
+              <span id="issueCount" class="pill warn">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="issueList" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>决策日志</h2>
+              <span id="decisionCount" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="decisionLog" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>成本日志</h2>
+              <span id="costTotal" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="costLog" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Job 日志</h2>
+              <span id="jobCount" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="jobLog" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>事件流</h2>
+              <span id="eventCount" class="pill">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="eventLog" class="stack"></div>
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        board: null,
+        runId: null,
+        reviewRequestId: null,
+        reviewDetail: null,
+        pendingReviewRequestId: null,
+      };
+      const $ = (id) => document.getElementById(id);
+
+      const statusLabels = {
+        draft: "草稿",
+        queued: "已排队",
+        running: "运行中",
+        waiting_review: "待审核",
+        paused: "已暂停",
+        completed: "已完成",
+        failed: "失败",
+        cancelled: "已取消",
+        approved: "已通过",
+        rejected: "已驳回",
+        skipped: "已跳过",
+        submitted: "已提交",
+        succeeded: "成功",
+        archived: "已归档",
+        waiting_provider: "等待服务商",
+        in_progress: "处理中",
+        changes_requested: "要求修改",
+        superseded: "已作废",
+      };
+
+      const stageLabels = {
+        intake: "接收",
+        plan: "规划",
+        script: "脚本",
+        storyboard: "分镜",
+        asset_generation: "素材生成",
+        asset_review: "素材审核",
+        edit: "剪辑",
+        compose: "合成",
+        final_review: "最终审核",
+        export: "导出",
+      };
+
+      const artifactLabels = {
+        intake_brief: "接收简报",
+        production_plan: "制作计划",
+        spoken_script: "口播脚本",
+        shot_list: "分镜清单",
+        preflight_report: "能力预检",
+        execution_plan: "执行方案",
+        proposal_packet: "制作提案",
+        stage_execution_manifest: "执行清单",
+        composition_graph: "合成图",
+        render_summary: "渲染摘要",
+        publish_package: "发布包",
+        quality_report: "质量报告",
+        edit_operation_report: "编辑报告",
+      };
+
+      const assetLabels = {
+        rendered_video: "渲染成片",
+        edited_video: "编辑版本",
+        avatar_video_clip: "数字人视频",
+        cover_image: "封面图",
+        html_canvas_preview: "HTML/Canvas 预览",
+        subtitle_file: "字幕文件",
+        tts_audio: "口播音频",
+        background_music: "背景音乐",
+      };
+
+      // Backend keys stay English; only the Web display layer is localized.
+      const reviewStatusLabels = {
+        open: "待审核",
+        approved: "已通过",
+        changes_requested: "要求修改",
+        rejected: "已驳回",
+        cancelled: "已取消",
+        superseded: "已作废",
+      };
+
+      const reviewDecisionLabels = {
+        approve: "通过",
+        approve_with_changes: "带修改通过",
+        request_changes: "要求修改",
+        reject: "驳回",
+        reopen: "重新打开",
+        cancel: "取消",
+      };
+
+      const reviewActionKindLabels = {
+        rerun_stage: "重跑阶段",
+        rerun_artifact: "重跑产物",
+        regenerate_media: "重新生成素材",
+        reanalyze_source: "重新分析源素材",
+        manual: "人工处理",
+      };
+
+      const reviewActionStatusLabels = {
+        open: "待处理",
+        in_progress: "处理中",
+        done: "已完成",
+        dismissed: "已忽略",
+      };
+
+      const commentStatusLabels = {
+        open: "未解决",
+        resolved: "已解决",
+        dismissed: "已忽略",
+      };
+
+      const severityLabels = {
+        critical: "严重",
+        suggestion: "建议",
+        nitpick: "细节",
+      };
+
+      // `review_policy.review_focus` is a bounded key vocabulary declared in the
+      // pipeline DSL, so it is translated here rather than in the DSL.
+      const reviewFocusLabels = {
+        "account/data prerequisites": "账号与数据前置条件",
+        "audience fit": "受众契合度",
+        "audio clarity": "音频清晰度",
+        "audio mix": "混音",
+        "asset coverage": "素材覆盖",
+        "asset transitions": "素材衔接",
+        "beat order": "节拍顺序",
+        "brand fit": "品牌契合度",
+        "coverage of beats": "节拍覆盖度",
+        "dub timing": "配音时间轴",
+        "generated asset fit": "生成素材适配度",
+        "generation scope": "生成范围",
+        "glossary": "术语表",
+        "glossary adherence": "术语一致性",
+        "lip-sync policy": "口型策略",
+        "story coherence": "故事连贯性",
+        "story structure": "故事结构",
+        "style consistency": "风格一致性",
+        "target languages": "目标语言",
+        "timing fit": "时间轴契合度",
+        "translation accuracy": "翻译准确性",
+        "user asset coverage": "用户素材覆盖",
+        "user asset quality": "用户素材质量",
+        "voice casting": "配音选角",
+        "avatar quality": "数字人质量",
+        "avatar suitability": "数字人适配度",
+        "brand/product accuracy": "品牌与产品准确性",
+        "brand/product fit": "品牌与产品契合度",
+        "candidate relevance": "候选片段相关性",
+        "caption placement": "字幕位置",
+        "caption readability": "字幕可读性",
+        "caption timing": "字幕时间轴",
+        captions: "字幕",
+        "capture feasibility": "录制可行性",
+        "clip duration": "片段时长",
+        "clip quality": "片段质量",
+        "concept accuracy": "概念准确性",
+        "cut points": "剪辑点",
+        "demo goal": "演示目标",
+        "diagram accuracy": "图示准确性",
+        duration: "时长",
+        "duration fit": "时长契合度",
+        "explanation clarity": "讲解清晰度",
+        "explanatory thesis": "解释主线",
+        "feature order": "功能顺序",
+        "final video quality": "成片质量",
+        hook: "开场钩子",
+        "hook strength": "钩子强度",
+        masking: "打码脱敏",
+        "narration cues": "旁白提示",
+        "plain-language explanation": "通俗化讲解",
+        "platform fit": "平台适配度",
+        "product promise": "产品卖点",
+        "product visibility": "产品露出",
+        "provider assumptions": "服务商能力假设",
+        "render feasibility": "渲染可行性",
+        rights: "版权",
+        "rights and sensitivity": "版权与敏感内容",
+        "scene pacing": "场景节奏",
+        "sensitive data": "敏感数据",
+        "shot sequence": "分镜顺序",
+        "source media present": "源素材齐备",
+        "spoken language": "口播语言",
+        "step accuracy": "步骤准确性",
+        "subtitle fit": "字幕适配度",
+        "subtitle readability": "字幕可读性",
+        "target clip count": "目标片段数量",
+        "target duration": "目标时长",
+        "test data": "测试数据",
+        "usage rights": "使用授权",
+        "viewer promise": "观众收益",
+        viewport: "视口设置",
+        "visual accuracy": "视觉准确性",
+        "visual clarity": "视觉清晰度",
+        "visual metaphor": "视觉隐喻",
+        "visual pacing": "视觉节奏",
+        "visual readability": "视觉可读性",
+      };
+
+      // The four decisions a reviewer can submit for one reviewed version.
+      const reviewDecisions = [
+        { key: "approve", label: "通过", tone: "primary" },
+        { key: "approve_with_changes", label: "带修改通过", tone: "" },
+        { key: "request_changes", label: "要求修改", tone: "" },
+        { key: "reject", label: "驳回", tone: "danger" },
+      ];
+
+      function setStatus(message, tone = "") {
+        const line = $("statusLine");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      async function api(path) {
+        const response = await fetch(path);
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            detail = body.detail || JSON.stringify(body);
+          } catch (error) {
+            detail = response.statusText;
+          }
+          throw new Error(detail);
+        }
+        return response.json();
+      }
+
+      async function apiSend(path, method, body) {
+        const response = await fetch(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        if (!response.ok) {
+          let message = response.statusText;
+          try {
+            const payload = await response.json();
+            const detail = payload.detail;
+            message =
+              detail && typeof detail === "object"
+                ? `${detail.code || response.status}: ${detail.message || ""}`.trim()
+                : detail || JSON.stringify(payload);
+          } catch (error) {
+            message = response.statusText;
+          }
+          throw new Error(message);
+        }
+        return response.status === 204 ? null : response.json();
+      }
+
+      /** `ReviewGateError` payloads carry a machine-readable code; surface it. */
+      function reviewErrorMessage(error) {
+        const text = String(error && error.message ? error.message : error);
+        return text.replace(/\s+/g, " ").trim();
+      }
+
+      async function loadBoard(runId) {
+        if (!runId) return;
+        state.runId = runId;
+        $("runIdInput").value = runId;
+        window.history.replaceState(null, "", `?run_id=${encodeURIComponent(runId)}`);
+        setStatus("加载中", "warn");
+        try {
+          state.board = await api(`/api/runs/${runId}/board`);
+          $("workspaceLink").href = state.board.workspace_url;
+          render();
+          setStatus("已同步");
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        }
+      }
+
+      function render() {
+        const board = state.board;
+        if (!board) {
+          renderEmpty();
+          return;
+        }
+        renderSummary(board);
+        renderStages(board.stage_lanes || []);
+        renderReview(board);
+        renderArtifacts(board.artifact_timeline || []);
+        renderOutputs(board);
+        renderIssues(board);
+        renderDecisionLog(board.decision_log || []);
+        renderCostLog(board.cost_log || [], board.usage_summary || {});
+        renderJobLog(board.job_log || []);
+        renderEventLog(board.event_log || []);
+      }
+
+      function renderEmpty() {
+        $("summaryGrid").innerHTML = "";
+        [
+          "stageLanes",
+          "currentReview",
+          "reviewComments",
+          "reviewActionItems",
+          "reviewTimeline",
+          "artifactTimeline",
+          "primaryPreview",
+          "versionGroups",
+          "issueList",
+          "decisionLog",
+          "costLog",
+          "jobLog",
+          "eventLog",
+        ].forEach((id) => ($(id).innerHTML = '<div class="empty">暂无数据</div>'));
+        $("reviewCount").textContent = "0";
+        $("reviewCount").className = "pill";
+      }
+
+      function renderSummary(board) {
+        const run = board.run;
+        const metrics = board.metrics || {};
+        const usage = board.usage_summary || {};
+        const items = [
+          ["Run 状态", statusLabel(run.status)],
+          ["当前阶段", stageLabel(run.current_stage_key) || "-"],
+          ["产物", metrics.artifact_count || 0],
+          ["资产", metrics.asset_count || 0],
+          ["缺口", metrics.input_issue_count || 0],
+          ["成片版本", metrics.final_output_count || 0],
+          ["实际成本", formatMoney(usage.actual_cost)],
+          ["资产体积", formatBytes(usage.asset_bytes)],
+        ];
+        $("summaryGrid").innerHTML = items
+          .map(([label, value]) => `<div class="metric"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)
+          .join("");
+      }
+
+      function renderStages(lanes) {
+        $("stageCount").textContent = String(lanes.length);
+        if (!lanes.length) {
+          $("stageLanes").innerHTML = '<div class="empty">暂无阶段</div>';
+          return;
+        }
+        $("stageLanes").innerHTML = lanes
+          .map((lane) => {
+            const stage = lane.stage;
+            const review = lane.review_request;
+            const invalidated = (state.board?.invalidated_stages || []).includes(stage.stage_key);
+            return `
+              <div class="lane ${lane.current ? "current" : ""} ${invalidated ? "invalidated" : ""}">
+                <div class="item-title">${escapeHtml(stage.order)}. ${escapeHtml(stageLabel(stage.stage_key))}</div>
+                ${statusPill(stage.status)}
+                ${invalidated ? '<span class="pill bad">已失效</span>' : ""}
+                <div class="muted">产物 ${lane.artifacts.length} · 资产 ${lane.assets.length} · job ${lane.jobs.length} · 工具 ${lane.tool_invocations.length}</div>
+                ${
+                  review
+                    ? `<div class="muted">第 ${review.iteration} 轮 · ${escapeHtml(reviewRequestStatusLabel(review))}${lane.open_comment_count ? ` · 未解决评论 ${lane.open_comment_count}` : ""}${lane.open_action_item_count ? ` · 待办 ${lane.open_action_item_count}` : ""}</div>`
+                    : ""
+                }
+                ${lane.input_issues.length ? `<div class="muted">缺口：${escapeHtml(lane.input_issues.map((issue) => issue.reason || issue.status).join(" · "))}</div>` : ""}
+                ${lane.repair_actions.length ? `<div class="action-row">${lane.repair_actions.map((action) => `<button type="button" data-open-workspace>${escapeHtml(action.label)}</button>`).join("")}</div>` : ""}
+              </div>
+            `;
+          })
+          .join("");
+        bindWorkspaceButtons();
+      }
+
+      // ------------------------------------------------------------------
+      // Review block (T74)
+      //
+      // The board only carries the request summary; the reviewer's comments,
+      // asks and full decision history are loaded on demand from the review
+      // detail endpoint so the board payload stays small.
+      // ------------------------------------------------------------------
+
+      function renderReview(board) {
+        const requests = (board.review_requests || []).filter(
+          (item) => item.status !== "superseded",
+        );
+        const active = requests.filter((item) => item.status === "open").slice(-1)[0];
+        const latest = requests.slice(-1)[0];
+        // A deep link pins the panel to one specific request even if a newer
+        // one opened in the meantime.
+        const preferred = state.pendingReviewRequestId
+          ? requests.find((item) => item.review_request_id === state.pendingReviewRequestId)
+          : null;
+        const target = preferred || active || latest;
+
+        const invalidated = (board.invalidated_stages || []).length;
+        $("reviewCount").textContent = active ? `${requests.length} · 待办` : String(requests.length);
+        $("reviewCount").className = `pill ${active ? "warn" : ""}`.trim();
+
+        if (!target) {
+          $("currentReview").innerHTML = '<div class="empty">暂无审核请求</div>';
+          $("reviewComments").innerHTML = "";
+          $("reviewActionItems").innerHTML = "";
+          $("reviewTimeline").innerHTML = '<div class="empty">暂无审核决策</div>';
+          state.reviewRequestId = null;
+          state.reviewDetail = null;
+          return;
+        }
+
+        const isOpen = target.status === "open";
+        state.reviewRequestId = target.review_request_id;
+        $("currentReview").innerHTML = `
+          <div class="review-card">
+            <div class="action-row">
+              <span class="pill ${toneForReviewStatus(target.status)}">${escapeHtml(reviewRequestStatusLabel(target))}</span>
+              <span class="pill info">${escapeHtml(stageLabel(target.stage_key))}</span>
+              <span class="pill">第 ${target.iteration} 轮</span>
+              ${target.current_decision ? `<span class="pill">最近决定 ${escapeHtml(reviewDecisionLabel(target.current_decision))}</span>` : ""}
+              ${target.overdue ? '<span class="pill bad">已逾期</span>' : ""}
+              ${invalidated ? `<span class="pill bad">下游失效 ${invalidated} 个阶段</span>` : ""}
+            </div>
+            <div class="review-snapshot">
+              <div class="muted">审核对象类型<strong>${escapeHtml((target.artifact_scope || []).map((ref) => `${artifactLabel(ref.artifact_type)} v${ref.version}`).join(" · ") || "-")}</strong></div>
+              <div class="muted">通过后进入<strong>${escapeHtml(stageLabel(target.gates_stage_key) || "-")}</strong></div>
+              <div class="muted">审核人<strong>${escapeHtml(target.assignee_user_id || "未指派")}</strong></div>
+              <div class="muted">截止时间<strong>${escapeHtml(target.due_at ? formatDate(target.due_at) : "-")}</strong></div>
+            </div>
+            <div>
+              <div class="muted">审核关注点</div>
+              <ul class="focus-list">${(target.review_focus || []).map((item) => `<li>${escapeHtml(reviewFocusLabel(item))}</li>`).join("") || "<li>-</li>"}</ul>
+            </div>
+            <div>
+              <div class="muted">通过标准</div>
+              <ul class="focus-list">${(target.success_criteria || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>-</li>"}</ul>
+            </div>
+            <div>
+              <div class="muted">决策（每次审核会产生一条不可修改的记录）</div>
+              <div class="action-row" id="reviewDecisionRow">
+                ${reviewDecisions
+                  .map(
+                    (item) =>
+                      `<button type="button" class="${item.tone}" data-review-decision="${item.key}" ${isOpen ? "" : "disabled"}>${escapeHtml(item.label)}</button>`,
+                  )
+                  .join("")}
+                <button type="button" data-review-reopen ${isOpen ? "disabled" : ""}>重新打开</button>
+                <button type="button" class="danger" data-review-cancel ${isOpen ? "" : "disabled"}>取消审核</button>
+              </div>
+            </div>
+            <div>
+              <div class="muted">审核意见</div>
+              <textarea id="reviewCommentBody" placeholder="说明问题或修改要求" ${isOpen ? "" : "disabled"}></textarea>
+              <div class="action-row" style="margin-top: 8px">
+                <select id="reviewCommentSeverity" ${isOpen ? "" : "disabled"}>
+                  <option value="critical">严重</option>
+                  <option value="suggestion" selected>建议</option>
+                  <option value="nitpick">细节</option>
+                </select>
+                <button type="button" data-review-comment ${isOpen ? "" : "disabled"}>添加评论</button>
+              </div>
+            </div>
+            <div>
+              <div class="muted">指派与截止时间</div>
+              <input id="reviewAssigneeInput" placeholder="assignee_user_id" value="${escapeHtml(target.assignee_user_id || "")}" />
+              <div class="action-row" style="margin-top: 8px">
+                <input id="reviewDueInput" type="datetime-local" value="${escapeHtml(localDateTimeValue(target.due_at))}" />
+                <button type="button" data-review-assign>保存指派</button>
+              </div>
+            </div>
+          </div>
+        `;
+        bindReviewButtons();
+        loadReviewDetail(target.review_request_id);
+      }
+
+      async function loadReviewDetail(reviewRequestId) {
+        try {
+          const detail = await api(`/api/review-requests/${reviewRequestId}`);
+          state.reviewDetail = detail;
+          renderReviewComments(detail);
+          renderReviewActionItems(detail);
+          renderReviewTimeline(detail);
+        } catch (error) {
+          $("reviewComments").innerHTML = `<div class="empty">评论加载失败：${escapeHtml(reviewErrorMessage(error))}</div>`;
+        }
+      }
+
+      function renderReviewComments(detail) {
+        const comments = detail.comments || [];
+        const header = `<div class="muted">评论 ${comments.length} 条</div>`;
+        if (!comments.length) {
+          $("reviewComments").innerHTML = `${header}<div class="empty">暂无评论</div>`;
+          return;
+        }
+        $("reviewComments").innerHTML =
+          header +
+          comments
+            .map(
+              (comment) => `
+                <div class="comment-item ${escapeHtml(comment.severity)}">
+                  <div class="item-title">
+                    <span class="severity-${escapeHtml(comment.severity)}">${escapeHtml(severityLabel(comment.severity))}</span>
+                    · ${escapeHtml(commentStatusLabel(comment.status))}
+                  </div>
+                  <div>${escapeHtml(comment.body)}</div>
+                  <div class="muted">${escapeHtml(comment.author_display_name || comment.author_user_id || "匿名")} · ${escapeHtml(formatDate(comment.created_at))}${comment.artifact_version ? ` · v${comment.artifact_version}` : ""}</div>
+                  ${
+                    comment.status === "open"
+                      ? `<div class="action-row" style="margin-top: 6px"><button type="button" data-resolve-comment="${escapeHtml(comment.comment_id)}">标记已解决</button></div>`
+                      : ""
+                  }
+                </div>
+              `,
+            )
+            .join("");
+        document.querySelectorAll("[data-resolve-comment]").forEach((button) => {
+          button.addEventListener("click", () => updateCommentStatus(button.dataset.resolveComment, "resolved"));
+        });
+      }
+
+      function renderReviewActionItems(detail) {
+        const items = detail.action_items || [];
+        if (!items.length) {
+          $("reviewActionItems").innerHTML =
+            '<div class="muted">修改待办 0 项</div><div class="empty">暂无待办</div>';
+          return;
+        }
+        $("reviewActionItems").innerHTML =
+          `<div class="muted">修改待办 ${items.length} 项</div>` +
+          items
+            .map(
+              (item) => `
+                <div class="item">
+                  <div class="item-title">${escapeHtml(reviewActionKindLabel(item.kind))} · ${escapeHtml(stageLabel(item.stage_key) || "-")}</div>
+                  <div>${statusPill(item.status === "done" ? "completed" : item.status === "dismissed" ? "archived" : "waiting_review")}</div>
+                  <div>${escapeHtml(item.instruction)}</div>
+                  <div class="muted">${escapeHtml(reviewActionStatusLabel(item.status))}${item.result_action ? ` · 可用动作 ${item.result_action}` : ""}</div>
+                </div>
+              `,
+            )
+            .join("");
+      }
+
+      function renderReviewTimeline(detail) {
+        const decisions = detail.decisions || [];
+        if (!decisions.length) {
+          $("reviewTimeline").innerHTML = '<div class="empty">暂无审核决策</div>';
+          return;
+        }
+        $("reviewTimeline").innerHTML = decisions
+          .slice()
+          .reverse()
+          .map(
+            (decision) => `
+              <div class="decision-item">
+                <div class="item-title">#${decision.sequence} ${escapeHtml(reviewDecisionLabel(decision.decision))}</div>
+                <div class="muted">第 ${decision.round} 轮 · ${escapeHtml(decision.actor_display_name || decision.actor_user_id || "系统")} · ${escapeHtml(formatDate(decision.created_at))}</div>
+                ${decision.comment ? `<div>${escapeHtml(decision.comment)}</div>` : ""}
+                <div class="muted">${escapeHtml((decision.artifact_refs || []).map((ref) => `${artifactLabel(ref.artifact_type)} v${ref.version}`).join(" · "))}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function bindReviewButtons() {
+        document.querySelectorAll("[data-review-decision]").forEach((button) => {
+          button.addEventListener("click", () => submitReviewDecision(button.dataset.reviewDecision));
+        });
+        const reopen = document.querySelector("[data-review-reopen]");
+        if (reopen) reopen.addEventListener("click", () => submitReviewDecision("reopen"));
+        const cancel = document.querySelector("[data-review-cancel]");
+        if (cancel) cancel.addEventListener("click", () => submitReviewDecision("cancel"));
+        const comment = document.querySelector("[data-review-comment]");
+        if (comment) comment.addEventListener("click", addReviewComment);
+        const assign = document.querySelector("[data-review-assign]");
+        if (assign) assign.addEventListener("click", assignReviewRequest);
+      }
+
+      async function submitReviewDecision(decision) {
+        if (!state.reviewRequestId) return;
+        const body = $("reviewCommentBody");
+        const severity = $("reviewCommentSeverity");
+        const payload = { decision, comment: body && body.value.trim() ? body.value.trim() : null };
+        setStatus(`提交审核决策：${reviewDecisionLabel(decision)}`, "warn");
+        try {
+          await apiSend(
+            `/api/review-requests/${state.reviewRequestId}/decisions`,
+            "POST",
+            payload,
+          );
+          // A critical finding is anchored to the same version under review.
+          if (
+            severity &&
+            body &&
+            body.value.trim() &&
+            ["request_changes", "reject"].includes(decision)
+          ) {
+            try {
+              const scope = (state.reviewDetail?.artifact_scope || [])[0];
+              await apiSend(`/api/review-requests/${state.reviewRequestId}/comments`, "POST", {
+                body: body.value.trim(),
+                severity: severity.value,
+                artifact_id: scope ? scope.artifact_id : null,
+                artifact_version: scope ? scope.version : null,
+              });
+            } catch (error) {
+              setStatus(`决策已记录，但评论写入失败：${reviewErrorMessage(error)}`, "error");
+              await loadBoard(state.runId);
+              return;
+            }
+          }
+          await loadBoard(state.runId);
+          setStatus("审核决策已记录");
+        } catch (error) {
+          setStatus(`提交失败：${reviewErrorMessage(error)}`, "error");
+        }
+      }
+
+      async function addReviewComment() {
+        if (!state.reviewRequestId) return;
+        const body = $("reviewCommentBody");
+        if (!body || !body.value.trim()) {
+          setStatus("请先填写审核意见", "warn");
+          return;
+        }
+        const scope = (state.reviewDetail?.artifact_scope || [])[0];
+        try {
+          await apiSend(`/api/review-requests/${state.reviewRequestId}/comments`, "POST", {
+            body: body.value.trim(),
+            severity: $("reviewCommentSeverity").value,
+            artifact_id: scope ? scope.artifact_id : null,
+            artifact_version: scope ? scope.version : null,
+          });
+          body.value = "";
+          await loadReviewDetail(state.reviewRequestId);
+          setStatus("评论已添加");
+        } catch (error) {
+          setStatus(`评论失败：${reviewErrorMessage(error)}`, "error");
+        }
+      }
+
+      async function updateCommentStatus(commentId, status) {
+        try {
+          await apiSend(`/api/review-comments/${commentId}`, "PATCH", { status });
+          await loadReviewDetail(state.reviewRequestId);
+          setStatus("评论状态已更新");
+        } catch (error) {
+          setStatus(`更新失败：${reviewErrorMessage(error)}`, "error");
+        }
+      }
+
+      async function assignReviewRequest() {
+        if (!state.reviewRequestId) return;
+        const assignee = $("reviewAssigneeInput").value.trim();
+        const due = $("reviewDueInput").value;
+        try {
+          await apiSend(`/api/review-requests/${state.reviewRequestId}/assign`, "POST", {
+            assignee_user_id: assignee || null,
+            due_at: due ? new Date(due).toISOString() : null,
+          });
+          await loadBoard(state.runId);
+          setStatus("指派已保存");
+        } catch (error) {
+          setStatus(`指派失败：${reviewErrorMessage(error)}`, "error");
+        }
+      }
+
+      function renderArtifacts(artifacts) {
+        $("artifactCount").textContent = String(artifacts.length);
+        if (!artifacts.length) {
+          $("artifactTimeline").innerHTML = '<div class="empty">暂无产物</div>';
+          return;
+        }
+        $("artifactTimeline").innerHTML = artifacts
+          .map(
+            (artifact) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(artifactLabel(artifact.artifact_type))} v${artifact.version}</div>
+                <div>${statusPill(artifact.is_current ? "current" : "archived")}</div>
+                <div class="muted">${escapeHtml(stageLabel(artifact.stage_key))} · ${escapeHtml(artifact.schema_key || artifact.producer || "")}</div>
+                <div class="muted">${escapeHtml(artifact.summary || artifact.title || "")}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderOutputs(board) {
+        const outputs = board.final_outputs || [];
+        $("outputCount").textContent = String(outputs.length);
+        if (!outputs.length) {
+          $("primaryPreview").innerHTML = '<div class="empty">暂无成片输出</div>';
+          $("versionGroups").innerHTML = "";
+          return;
+        }
+        const primary = outputs.find((asset) => asset.asset_type === "rendered_video") || outputs[outputs.length - 1];
+        $("primaryPreview").innerHTML = renderAssetPreview(primary);
+        $("versionGroups").innerHTML = (board.version_groups || [])
+          .map(
+            (group) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(group.label)}</div>
+                <div class="stack">
+                  ${group.assets
+                    .map(
+                      (asset) => `
+                        <div>
+                          <a href="${assetUrl(asset)}" target="_blank" rel="noreferrer">${escapeHtml(assetLabel(asset))}</a>
+                          <span class="muted">${escapeHtml(asset.mime_type || "")} · ${asset.width || "-"}x${asset.height || "-"} · ${formatBytes(asset.file_size)}</span>
+                        </div>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function assetUrl(asset) {
+        if (asset.download_url) {
+          return asset.download_url;
+        }
+        return `/api/assets/${encodeURIComponent(asset.asset_id)}/download`;
+      }
+
+      function renderAssetPreview(asset) {
+        const mime = asset.mime_type || "";
+        const title = `<div class="item-title">${escapeHtml(assetLabel(asset))}</div>`;
+        const url = assetUrl(asset);
+        const link = `<div class="action-row"><a href="${url}" target="_blank" rel="noreferrer">下载</a><a href="${url}" target="_blank" rel="noreferrer">新窗口打开</a></div>`;
+        if (mime.startsWith("video/")) {
+          return `${title}<video controls src="${url}"></video>${link}`;
+        }
+        if (mime.startsWith("audio/")) {
+          return `${title}<audio controls src="${url}"></audio>${link}`;
+        }
+        if (mime.startsWith("image/")) {
+          return `${title}<img src="${url}" alt="${escapeHtml(assetLabel(asset))}" />${link}`;
+        }
+        if (asset.asset_type === "html_canvas_preview") {
+          return `${title}<iframe src="${url}" title="${escapeHtml(assetLabel(asset))}"></iframe>${link}`;
+        }
+        return `${title}<div class="item">${link}</div>`;
+      }
+
+      function renderIssues(board) {
+        const issues = board.input_issues || [];
+        const actions = board.repair_actions || [];
+        const downgrades = board.intent_downgrades || [];
+        const reservation = board.cost_reservation || {};
+        const pendingProviders = board.paid_providers_pending || [];
+        const hasReservation =
+          reservation.reserved_cost !== undefined && reservation.reserved_cost !== null;
+        $("issueCount").textContent = String(issues.length);
+        if (!issues.length && !actions.length && !downgrades.length && !hasReservation) {
+          $("issueList").innerHTML = '<div class="empty">暂无输入缺口</div>';
+          return;
+        }
+        $("issueList").innerHTML = [
+          ...(hasReservation
+            ? [costReservationRow(reservation, pendingProviders)]
+            : []),
+          ...downgrades.map(
+            (item) => `
+              <div class="item">
+                <div class="item-title">质量降级 · ${escapeHtml(stageLabel(item.stage_key))} · ${escapeHtml(item.capability || "")}</div>
+                <span class="pill warn">需确认</span>
+                <div class="muted">${escapeHtml(
+                  item.kind === "capability_missing"
+                    ? "该能力没有可用工具，会被跳过"
+                    : `改用 ${item.selected_tool_key || "未知工具"}（${item.expected_runtime} → ${item.selected_runtime || "local"}）`,
+                )}</div>
+                <div class="muted">${escapeHtml(item.reason || "")}</div>
+              </div>
+            `,
+          ),
+          ...issues.map(
+            (issue) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(stageLabel(issue.stage_key))} · ${escapeHtml(issue.tool_key || issue.capability || "")}</div>
+                <div>${statusPill(issue.status)}</div>
+                <div class="muted">${escapeHtml(issue.reason || "")}</div>
+                <div class="muted">缺少：${escapeHtml((issue.missing_inputs || []).join(" · ") || "-")}</div>
+              </div>
+            `,
+          ),
+          ...actions.map(
+            (action) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(action.label)}</div>
+                <div class="muted">${escapeHtml(stageLabel(action.stage_key))} · ${escapeHtml(action.action)}</div>
+                <button type="button" data-open-workspace>去工作台处理</button>
+              </div>
+            `,
+          ),
+        ].join("");
+        bindWorkspaceButtons();
+      }
+
+      function costReservationRow(reservation, pendingProviders) {
+        const currency = reservation.currency || "USD";
+        const budgetText =
+          reservation.budget_limit === null || reservation.budget_limit === undefined
+            ? "未设置预算"
+            : `${reservation.budget_limit} ${currency}`;
+        const tone = reservation.budget_status === "exceeds_budget" ? "bad" : "warn";
+        const pending = pendingProviders.length
+          ? `<div class="muted">待确认付费 provider：${escapeHtml(pendingProviders.join(" / "))}</div>`
+          : "";
+        return `
+          <div class="item">
+            <div class="item-title">成本预留 · 预留 ${escapeHtml(String(reservation.reserved_cost ?? 0))} ${escapeHtml(currency)}</div>
+            <span class="pill ${tone}">${escapeHtml(budgetStatusLabel(reservation.budget_status))}</span>
+            <div class="muted">预算 ${escapeHtml(budgetText)}</div>
+            ${pending}
+            <div class="muted">付费 provider：${escapeHtml((reservation.paid_providers || []).join(" / ") || "无")}</div>
+          </div>
+        `;
+      }
+
+      function budgetStatusLabel(status) {
+        return (
+          {
+            within_budget: "在预算内",
+            exceeds_budget: "超出预算",
+            not_configured: "未设置预算",
+          }[status] ||
+          status ||
+          "-"
+        );
+      }
+
+      function renderDecisionLog(decisions) {
+        $("decisionCount").textContent = String(decisions.length);
+        if (!decisions.length) {
+          $("decisionLog").innerHTML = '<div class="empty">暂无决策日志</div>';
+          return;
+        }
+        $("decisionLog").innerHTML = decisions
+          .slice(0, 40)
+          .map(
+            (decision) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(decision.decision_id || decision.subject || "decision")}</div>
+                <div>${statusPill(decision.decision || decision.preflight_status)}</div>
+                <div class="muted">${escapeHtml(stageLabel(decision.stage_key))} · ${escapeHtml(decision.capability || "")} · ${escapeHtml(decision.selected_tool_key || "未选择工具")}</div>
+                <div class="muted">${escapeHtml(decision.rationale || decision.selection_reason || "")}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderCostLog(entries, usage) {
+        $("costTotal").textContent = formatMoney(usage.actual_cost || usage.estimated_cost || 0);
+        if (!entries.length) {
+          $("costLog").innerHTML = '<div class="empty">暂无用量记录</div>';
+          return;
+        }
+        $("costLog").innerHTML = entries
+          .slice(-30)
+          .reverse()
+          .map(
+            (entry) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(entry.operation)}</div>
+                <div class="muted">${escapeHtml(entry.source_type)} · ${escapeHtml(entry.provider || entry.tool_key || "-")} · ${formatMoney(entry.actual_cost || entry.estimated_cost || 0)}</div>
+                <div class="muted">tokens ${entry.input_tokens || 0}/${entry.output_tokens || 0} · ${formatBytes(entry.asset_bytes)}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderJobLog(jobs) {
+        $("jobCount").textContent = String(jobs.length);
+        if (!jobs.length) {
+          $("jobLog").innerHTML = '<div class="empty">暂无 job</div>';
+          return;
+        }
+        $("jobLog").innerHTML = jobs
+          .slice()
+          .reverse()
+          .map(
+            (job) => `
+              <div class="item">
+                <div class="item-title">${escapeHtml(job.job_type)} · ${escapeHtml(job.job_id)}</div>
+                <div>${statusPill(job.status)} <span class="muted">${job.progress}% · attempt ${job.attempt}/${job.max_attempts}</span></div>
+                <div class="muted">${escapeHtml(job.error_user_message || job.error_message || job.error_code || "")}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderEventLog(events) {
+        $("eventCount").textContent = String(events.length);
+        if (!events.length) {
+          $("eventLog").innerHTML = '<div class="empty">暂无事件</div>';
+          return;
+        }
+        $("eventLog").innerHTML = events
+          .slice()
+          .reverse()
+          .slice(0, 40)
+          .map(
+            (event) => `
+              <div class="item">
+                <div class="item-title">#${event.sequence} ${escapeHtml(event.event_type)}</div>
+                <div class="muted">${escapeHtml(stageLabel(event.stage_key))} · ${escapeHtml(event.message || "")}</div>
+                <div class="muted">${formatDate(event.created_at)}</div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function bindWorkspaceButtons() {
+        document.querySelectorAll("[data-open-workspace]").forEach((button) => {
+          button.addEventListener("click", () => {
+            window.location.href = state.board?.workspace_url || "/workspace";
+          });
+        });
+      }
+
+      function statusPill(status) {
+        const tone = {
+          completed: "good",
+          approved: "good",
+          succeeded: "good",
+          current: "info",
+          queued: "purple",
+          running: "info",
+          in_progress: "info",
+          waiting_review: "warn",
+          changes_requested: "warn",
+          waiting_provider: "warn",
+          waiting_input: "warn",
+          waiting_stage: "warn",
+          blocked: "bad",
+          failed: "bad",
+          rejected: "bad",
+          cancelled: "bad",
+          superseded: "bad",
+          archived: "",
+        }[status] || "";
+        return `<span class="pill ${tone}">${escapeHtml(statusLabel(status))}</span>`;
+      }
+
+      function statusLabel(status) {
+        return statusLabels[status] || status || "-";
+      }
+
+      function stageLabel(stage) {
+        return stageLabels[stage] || stage || "";
+      }
+
+      function artifactLabel(type) {
+        return artifactLabels[type] || type || "";
+      }
+
+      function reviewStatusLabel(status) {
+        return reviewStatusLabels[status] || status || "-";
+      }
+
+      // An approved request with a "带修改通过" decision still carries open
+      // action items, so the plain "已通过" label would hide them.
+      function reviewRequestStatusLabel(request) {
+        if (request.status === "approved" && request.current_decision === "approve_with_changes") {
+          return "已通过（带修改）";
+        }
+        if (request.status === "open" && request.current_decision === "reopen") {
+          return "已重新打开";
+        }
+        return reviewStatusLabel(request.status);
+      }
+
+      function reviewDecisionLabel(decision) {
+        return reviewDecisionLabels[decision] || decision || "-";
+      }
+
+      function reviewActionKindLabel(kind) {
+        return reviewActionKindLabels[kind] || kind || "-";
+      }
+
+      function reviewActionStatusLabel(status) {
+        return reviewActionStatusLabels[status] || status || "-";
+      }
+
+      function severityLabel(severity) {
+        return severityLabels[severity] || severity || "-";
+      }
+
+      function reviewFocusLabel(key) {
+        return reviewFocusLabels[key] || key;
+      }
+
+      function commentStatusLabel(status) {
+        return commentStatusLabels[status] || status || "-";
+      }
+
+      function toneForReviewStatus(status) {
+        return (
+          {
+            open: "warn",
+            approved: "good",
+            changes_requested: "warn",
+            rejected: "bad",
+            cancelled: "bad",
+            superseded: "",
+          }[status] || ""
+        );
+      }
+
+      function localDateTimeValue(value) {
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        const pad = (part) => String(part).padStart(2, "0");
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
+      function assetLabel(asset) {
+        return assetLabels[asset.asset_type] || asset.asset_type || asset.asset_id;
+      }
+
+      function formatMoney(value) {
+        const number = Number(value || 0);
+        return `$${number.toFixed(4)}`;
+      }
+
+      function formatBytes(value) {
+        const number = Number(value || 0);
+        if (!number) return "0 B";
+        const units = ["B", "KB", "MB", "GB"];
+        let size = number;
+        let index = 0;
+        while (size >= 1024 && index < units.length - 1) {
+          size /= 1024;
+          index += 1;
+        }
+        return `${size.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+      }
+
+      function formatDate(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      $("runForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        loadBoard($("runIdInput").value.trim());
+      });
+      $("refreshButton").addEventListener("click", () => loadBoard(state.runId || $("runIdInput").value.trim()));
+
+      const params = new URLSearchParams(window.location.search);
+      const initialRunId = params.get("run_id");
+      const initialReviewRequestId = params.get("review_request_id");
+      state.pendingReviewRequestId = initialReviewRequestId;
+
+      async function bootstrap() {
+        if (initialRunId) {
+          loadBoard(initialRunId);
+          return;
+        }
+        // Deep link coming from a review inbox / review request URL.
+        if (initialReviewRequestId) {
+          setStatus("正在解析审核请求", "warn");
+          try {
+            const detail = await api(`/api/review-requests/${initialReviewRequestId}`);
+            loadBoard(detail.run_id);
+            return;
+          } catch (error) {
+            setStatus(`加载失败：${reviewErrorMessage(error)}`, "error");
+          }
+        }
+        renderEmpty();
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>

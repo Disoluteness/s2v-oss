@@ -1,0 +1,275 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "animated_explainer",
+  "display_name": "Animated Explainer",
+  "description": "Create short explainer videos from a topic or script using structured narration, visual beats, captions, and a planned motion-graphics render path.",
+  "version": "0.4.0",
+  "category": "animated_explainer",
+  "status": "beta",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": ["douyin", "xiaohongshu", "bilibili", "wechat_channels", "generic"],
+  "supported_aspect_ratios": ["9:16", "1:1", "16:9"],
+  "required_capabilities": ["llm_generation", "subtitle_generation", "video_composition", "storage"],
+  "optional_capabilities": ["tts", "music_generation", "image_generation", "audio_processing"],
+  "artifact_contracts": {
+    "intake_brief": {"schema_key": "intake_brief.v1", "description": "Normalized topic, script, target audience, duration, and format."},
+    "production_plan": {"schema_key": "production_plan.v1", "description": "Explainer thesis, structure, visual treatment, and production constraints."},
+    "spoken_script": {"schema_key": "spoken_script.v1", "description": "Timed narration segments and captions."},
+    "shot_list": {"schema_key": "shot_list.v1", "description": "Scene-by-scene visual beat plan for motion graphics."},
+    "asset_manifest": {"schema_key": "asset_manifest.v1", "description": "Generated and referenced visual, audio, and subtitle assets."},
+    "edit_plan": {"schema_key": "edit_plan.v1", "description": "Timeline, text overlays, audio mix, and composition intent."},
+    "render_summary": {"schema_key": "render_summary.v1", "description": "Render metadata and asset pointer."},
+    "review_notes": {"schema_key": "review_notes.v1", "description": "Human review outcome and requested changes."},
+    "publish_package": {"schema_key": "publish_package.v1", "description": "Downloadable final package and access links."}
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V3.2",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/animated_explainer.md",
+    "supported_use_cases": [
+      "science_explainer",
+      "product_concept_explainer",
+      "educational_short",
+      "data_or_process_explainer"
+    ],
+    "render_maturity": "planned_motion_graphics",
+    "migration_policy": "This beta pipeline validates orchestration and planning before the V5 composition graph renderer."
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Explainer Intake",
+      "description": "Normalize the topic, raw script, target audience, platform, duration, and aspect ratio.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Brief preserves the user topic or script.", "Audience, duration, platform, and aspect ratio are normalized."],
+      "required_input_artifacts": [],
+      "output_artifact_types": ["intake_brief"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "plan",
+      "display_name": "Explainer Plan",
+      "description": "Create the explanatory thesis, structure, visual metaphor, motion approach, and production assumptions.",
+      "order": 2,
+      "depends_on_stage_keys": ["intake"],
+      "input_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "output_artifacts": [{"artifact_type": "production_plan", "schema_key": "production_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"},
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["explanatory thesis", "audience fit", "visual metaphor", "duration fit", "render feasibility"],
+        "success_criteria": ["The plan explains one clear idea.", "The visual approach fits the selected render path."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Plan contains a thesis, structure, visual direction, and production assumptions."],
+      "required_input_artifacts": ["intake_brief"],
+      "output_artifact_types": ["production_plan"],
+      "required_capabilities": ["llm_generation", "video_composition"],
+      "optional_capabilities": ["image_generation", "tts", "music_generation"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "script",
+      "display_name": "Narration Script",
+      "description": "Turn the approved plan into timed narration and short captions.",
+      "order": 3,
+      "depends_on_stage_keys": ["plan"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "production_plan", "schema_key": "production_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"}],
+      "tool_requirements": [{"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["concept accuracy", "plain-language explanation", "caption readability", "duration"],
+        "success_criteria": ["Narration is understandable to the target audience.", "Captions are concise enough for mobile viewing."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Segments include text, captions, and timing."],
+      "required_input_artifacts": ["intake_brief", "production_plan"],
+      "output_artifact_types": ["spoken_script"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "storyboard",
+      "display_name": "Visual Beat Plan",
+      "description": "Map narration to motion-graphics scenes, diagrams, text beats, and supporting imagery.",
+      "order": 4,
+      "depends_on_stage_keys": ["script"],
+      "input_artifacts": [{"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"}],
+      "output_artifacts": [{"artifact_type": "shot_list", "schema_key": "shot_list.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"},
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["visual clarity", "scene pacing", "diagram accuracy", "caption placement"],
+        "success_criteria": ["Every narration segment has a visual beat.", "The plan avoids relying on avatar-only framing."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Shot list maps visuals and motion intent to spoken segment ids."],
+      "required_input_artifacts": ["spoken_script"],
+      "output_artifact_types": ["shot_list"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": ["image_generation"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "asset_generation",
+      "display_name": "Explainer Assets",
+      "description": "Generate or collect narration, subtitles, music, diagrams, and reference visuals.",
+      "order": 5,
+      "depends_on_stage_keys": ["storyboard"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "production_plan", "schema_key": "production_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "subtitle_generation", "required": true, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"},
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "background_worker"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": true, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Required subtitle assets are available or queued.", "Optional media assets are attached when providers are available."],
+      "required_input_artifacts": ["shot_list", "production_plan"],
+      "output_artifact_types": ["asset_manifest"],
+      "required_capabilities": ["subtitle_generation"],
+      "optional_capabilities": ["tts", "music_generation", "image_generation"],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Motion Edit Plan",
+      "description": "Create the timeline, text overlays, diagram beats, transitions, and audio mix plan.",
+      "order": 6,
+      "depends_on_stage_keys": ["asset_generation"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Edit plan identifies scene order, captions, overlays, audio, and render intent."],
+      "required_input_artifacts": ["shot_list", "asset_manifest"],
+      "output_artifact_types": ["edit_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "compose",
+      "display_name": "Compose Explainer",
+      "description": "Render the explainer from the edit plan and available media. In V3 this is planned but not auto-dispatched to the avatar-specific FFmpeg path.",
+      "order": 7,
+      "depends_on_stage_keys": ["edit"],
+      "input_artifacts": [
+        {"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["A render summary exists or the render blocker is explicit."],
+      "required_input_artifacts": ["edit_plan", "asset_manifest"],
+      "output_artifact_types": ["render_summary"],
+      "required_capabilities": ["video_composition"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Final Review",
+      "description": "Human review of the explainer render before export.",
+      "order": 8,
+      "depends_on_stage_keys": ["compose"],
+      "input_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["explanation clarity", "subtitle fit", "visual accuracy", "audio mix"],
+        "success_criteria": ["Final render is approved for export or concrete revisions are recorded."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes record approval or requested fixes."],
+      "required_input_artifacts": ["render_summary"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "render_summary_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "export",
+      "display_name": "Export Package",
+      "description": "Create the final publish package and access links.",
+      "order": 9,
+      "depends_on_stage_keys": ["final_review"],
+      "input_artifacts": [
+        {"artifact_type": "render_summary", "schema_key": "render_summary.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "publish_package", "schema_key": "publish_package.v1"}],
+      "tool_requirements": [{"capability": "storage", "required": true, "selector_policy": "best_available", "dispatch_policy": "inline_system"}],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": true, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Publish package contains render asset id and access URL metadata."],
+      "required_input_artifacts": ["render_summary", "review_notes"],
+      "output_artifact_types": ["publish_package"],
+      "required_capabilities": ["storage"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

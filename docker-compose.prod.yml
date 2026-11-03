@@ -1,0 +1,331 @@
+# Production compose for Script2Video Studio (V8.5).
+#
+# This is not the file to develop against — that is ``docker-compose.yml``, which
+# publishes its infrastructure ports, runs one worker, and leaves log rotation to
+# whoever notices the disk filling. This file is what a real host should run, and
+# the runbook that goes with it (install, upgrade, backup, restore, rollback) is
+# ``docs/DEPLOYMENT.md``. Read that first; this file is the machine-readable half.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# What is deliberately different from the dev file, and why each difference exists:
+#
+#   * **Infrastructure ports are not published.** MySQL, Redis and the MinIO
+#     console are reachable only on the compose network. The dev file exposes them
+#     for convenience; on a public host that is an unauthenticated Redis and a
+#     MinIO console still holding its default credentials.
+#   * **Migrations run as a one-shot service, not an `exec` someone remembers.**
+#     ``migrate`` runs ``alembic upgrade head`` once and exits; ``api`` and every
+#     worker wait on ``service_completed_successfully``. Two replicas racing the
+#     same upgrade is a real way to corrupt a schema, and a dependency edge makes
+#     it impossible rather than merely discouraged.
+#   * **The worker is split by role.** Four services, each with a ``WORKER_ROLE``
+#     (V8.1): a slow paid avatar submission can no longer sit in front of a
+#     subtitle burn, and a provider outage stops one queue instead of all of them.
+#   * **Resource limits and log rotation are declared.** An unbounded container is
+#     an outage waiting for a busy afternoon, and an unbounded json log file is an
+#     outage waiting for a quiet one.
+#   * **Secrets still come from ``.env`` only.** Nothing here is baked into an
+#     image, and nothing here has a default that would work in production by
+#     accident. ``scripts/deployment_preflight.py`` checks the values this file
+#     cannot.
+#
+# One caveat this file cannot fix: with plain Docker Compose, every value in
+# ``environment`` and ``env_file`` is readable by anyone who can run
+# ``docker inspect`` and by anything that can read ``/proc``. That is a property of
+# the runtime, not of this file. Where that matters, use the Kubernetes manifests
+# in ``infra/deploy/k8s/`` and mount the secret as a file instead.
+
+x-dashscope-provider-defaults: &dashscope-provider-defaults
+  DASHSCOPE_API_BASE_URL: ${DASHSCOPE_API_BASE_URL:-https://dashscope.aliyuncs.com}
+  DASHSCOPE_AVATAR_MODEL: ${DASHSCOPE_AVATAR_MODEL:-wan2.2-s2v}
+  DASHSCOPE_AVATAR_RESOLUTION: ${DASHSCOPE_AVATAR_RESOLUTION:-480P}
+  DASHSCOPE_AVATAR_DETECT_MODEL: ${DASHSCOPE_AVATAR_DETECT_MODEL:-emo-detect-v1}
+  DASHSCOPE_AVATAR_RATIO: ${DASHSCOPE_AVATAR_RATIO:-3:4}
+  DASHSCOPE_TTS_MODEL: ${DASHSCOPE_TTS_MODEL:-qwen3-tts-flash}
+  DASHSCOPE_IMAGE_MODEL: ${DASHSCOPE_IMAGE_MODEL:-qwen-image-2.0-pro}
+  DASHSCOPE_IMAGE_SIZE: ${DASHSCOPE_IMAGE_SIZE:-1024*1024}
+
+# Applied to every service. ``json-file`` with a cap is the least surprising
+# choice: it keeps ``docker compose logs`` working exactly as operators expect,
+# while making the disk cost of a noisy level bounded and predictable.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+# The image both api and worker are built from. Declared once because a drifted
+# pair of images is the classic "works in the API, fails in the worker" bug.
+x-app-build: &app-build
+  context: .
+  dockerfile: infra/docker/api.Dockerfile
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-script2video}
+      MYSQL_USER: ${MYSQL_USER:-script2video}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # Durability over throughput: a production box that loses the last second of
+      # committed transactions after a crash is a data-integrity bug, not a
+      # performance tradeoff, and the spend ledger is exactly the kind of row that
+      # must survive a power cut.
+      - --innodb-flush-log-at-trx-commit=1
+      - --max-connections=${MYSQL_MAX_CONNECTIONS:-200}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: always
+    logging: *default-logging
+    healthcheck:
+      # No published port means no way to check from outside; this runs inside the
+      # container and is what the dependency conditions below actually wait on.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    restart: always
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512m
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    volumes:
+      - minio_data:/data
+    restart: always
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+
+  # One shot: apply every pending migration, then exit. The whole point is that
+  # ``api`` and the workers cannot start until this has succeeded, so a schema and
+  # the code that expects it can never be out of step by accident.
+  migrate:
+    build: *app-build
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  api:
+    build: *app-build
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+      # Structured logs are the sensible production default, but they are set
+      # here — in the production file — rather than in the code, so the code stays
+      # opt-in and a deployment that upgrades without adopting this file sees no
+      # change at all (V8.2).
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    ports:
+      - "${API_BIND:-0.0.0.0}:${API_PORT:-18080}:8080"
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+    logging: *default-logging
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # ``curl`` is in the image (the Dockerfile installs it). The probe is on the
+      # API, not on the port: a process that is up but cannot reach its database
+      # answers the port and fails every request, and that is exactly the state a
+      # health check exists to distinguish.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+
+  # Four workers, one per queue (V8.1). ``queue`` is a property of the job, so
+  # adding a role here is the only change needed to give that queue its own
+  # capacity; the ``all`` role the dev file uses still exists and still behaves
+  # exactly as a single worker did before V8.1.
+  worker-provider:
+    build: *app-build
+    command: ["python", "-m", "apps.worker.background_jobs"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      WORKER_ROLE: provider
+      # Worker metrics are off by default in the code; turning them on here and
+      # publishing the port only on the compose network gets them scraped without
+      # exposing them to the host.
+      WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+    logging: *default-logging
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2g
+
+  worker-analysis:
+    build: *app-build
+    command: ["python", "-m", "apps.worker.background_jobs"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      WORKER_ROLE: analysis
+      WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+    logging: *default-logging
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3g
+
+  worker-media:
+    build: *app-build
+    command: ["python", "-m", "apps.worker.background_jobs"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      WORKER_ROLE: media
+      WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+    logging: *default-logging
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          # ffmpeg is the CPU-bound step in this stack; this is the one limit
+          # worth tuning against the host rather than copying.
+          cpus: "${WORKER_MEDIA_CPUS:-4.0}"
+          memory: 4g
+
+  worker-render:
+    build: *app-build
+    command: ["python", "-m", "apps.worker.background_jobs"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+      APP_ENV: ${APP_ENV:-production}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      WORKER_ROLE: render
+      WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-9100}
+    volumes:
+      - ./storage:/app/storage
+    restart: always
+    logging: *default-logging
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_RENDER_CPUS:-4.0}"
+          memory: 4g
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:

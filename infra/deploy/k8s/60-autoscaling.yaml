@@ -1,0 +1,104 @@
+# Autoscaling and disruption budgets.
+#
+# These are the two halves of the same statement: "scale under load, and keep
+# serving while you do". An HPA without a budget will happily scale in below the
+# number of replicas a node drain needs to respect, which turns routine cluster
+# maintenance into an outage.
+---
+# The API is stateless and cheap to add to, so it scales on CPU. The metric to
+# watch in practice is latency, which the HPA cannot see without a custom metrics
+# adapter — the panel at `GET /api/projects/{id}/observability` is where that is
+# read (V8.2), and CPU is the proxy that reacts first.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: s2v-api
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: s2v-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Scale in slowly. A run that just finished freeing CPU does not mean the
+      # queue behind it is empty, and flapping replicas cost more than they save:
+      # every removed replica is a rolling-update window that could drop a request.
+      stabilizationWindowSeconds: 300
+---
+# The media queue is the one that genuinely benefits from bursting: ffmpeg work
+# arrives in batches (a run with twenty scenes), and each job is CPU-bound and
+# independent, so more replicas really is more throughput.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: s2v-worker-media
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: s2v-worker-media
+  minReplicas: 1
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      # Much slower than the API's. A worker mid-encode cannot be rescheduled
+      # cheaply: killing it loses the work and the queue re-claims it from the
+      # start, so scaling in has to be certain the burst is over.
+      stabilizationWindowSeconds: 900
+---
+# Never take the last API replica down. Without this, a node drain (or any
+# eviction) can remove the final pod and the service is simply gone.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: s2v-api
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: api
+---
+# One per queue rather than one for all workers. The queues are independent, so a
+# disruption is allowed to empty the analysis queue while the media queue keeps
+# two replicas — a single budget across every worker label would either be
+# needlessly strict or would fail to protect the queue that is actually busy.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: s2v-worker-media
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/queue: media

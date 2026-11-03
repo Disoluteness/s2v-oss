@@ -1,0 +1,46 @@
+[project]
+name = "script2video-studio"
+version = "0.1.0"
+description = "Clean-room AI script-to-video production platform"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.0",
+  "pydantic-settings>=2.4.0",
+  "sqlalchemy>=2.0.0",
+  "alembic>=1.14.0",
+  "psycopg[binary]>=3.2.0",
+  "pymysql>=1.1.1",
+  "redis>=5.0.0",
+  "python-dotenv>=1.0.0",
+  "prometheus-client>=0.21.0",
+  "cryptography>=43.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.6.0",
+  "mypy>=1.11.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["apps*", "packages*"]
+exclude = ["infra*", "pipelines*", "docs*", "tests*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+# ``sdk/python`` is on the path so the tests can import the client exactly as a
+# consumer would (``import s2v``), and ``tests`` so the shared ASGI harness is
+# importable by name rather than by relative path.
+pythonpath = [".", "sdk/python", "tests"]
+testpaths = ["tests"]

@@ -1,0 +1,115 @@
+# Non-secret configuration, and the shape of the secret.
+#
+# The split is not cosmetic. Everything in the ConfigMap is safe to read from a
+# dashboard, a debug shell or a `kubectl describe`; everything in the Secret is
+# the material that decides which provider account the tenant's paid calls are
+# billed to, who may mint credentials, and whether a signed asset link can be
+# forged. Putting the two together is how a "temporary" debug print becomes an
+# incident.
+#
+# These manifests run the *application* only. MySQL, Redis and object storage are
+# assumed to be provided for the namespace — a managed database, or a separate
+# release — because running a stateful database inside a set of manifests that
+# also get rolled forward with each application release is a decision with its own
+# backup and upgrade story, and folding it in here would hide that. The connection
+# details arrive through the Secret like any other cluster-external dependency.
+#
+# Apply the ConfigMap as-is after editing the values marked CHANGE ME, and create
+# the Secret from the real values (this file is a template, not a manifest to
+# apply):
+#
+#   kubectl -n s2v-studio apply -f 10-config.yaml
+#   kubectl -n s2v-studio create secret generic s2v-secrets \
+#     --from-literal=DATABASE_URL='mysql+pymysql://user:pass@mysql:3306/s2v?charset=utf8mb4' \
+#     --from-literal=REDIS_URL='redis://redis:6379/0' \
+#     --from-literal=ASSET_LINK_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=SECRET_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+#     --from-literal=API_KEY_PEPPER="$(openssl rand -base64 32)" \
+#     --from-literal=EMBED_TOKEN_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=PROVIDER_CALLBACK_SECRET="$(openssl rand -base64 32)"
+#
+# Do not commit a filled-in copy of this file. The one in the repository has no
+# real values in it, and that is the point.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s2v-config
+  namespace: s2v-studio
+data:
+  # --- environment and identity ---------------------------------------------
+  # Not "local"/"dev"/"test": behaviours are keyed on this — signed asset links
+  # refuse to be minted with the development default secret outside those
+  # environments, and `deployment_capabilities` reports posture against it.
+  APP_ENV: "production"
+  DEPLOYMENT_NAME: "s2v-studio" # CHANGE ME to something a human recognises
+  # Behind an ingress the Host header is the internal hop, while the links the
+  # platform mints (embed sessions, asset links) must carry the address callers
+  # actually use. So it has to be stated, not inferred.
+  PUBLIC_BASE_URL: "https://studio.example.com" # CHANGE ME
+  # `secret` trusts no header at all unless it carries the matching shared secret.
+  # `open` is for a single-tenant box with no untrusted traffic in front of it.
+  ACTOR_TRUST_MODE: "secret" # CHANGE ME to "open" only on a trusted network
+
+  # --- storage ---------------------------------------------------------------
+  OBJECT_STORAGE_BACKEND: "local"
+  LOCAL_STORAGE_ROOT: "/app/storage"
+
+  # --- observability --------------------------------------------------------
+  LOG_FORMAT: "json"
+  LOG_LEVEL: "INFO"
+  # Metrics are off in the code by default; turning them on here publishes them
+  # only inside the namespace, where a scrape config can find them. `/metrics` is
+  # deliberately unauthenticated: keep it off the public edge.
+  WORKER_METRICS_PORT: "9100"
+
+  # --- optional behaviour this deployment has chosen -------------------------
+  # Maintenance mode needs no switch here: it lives in the database (V8.5), which
+  # is exactly what makes it usable while the install is being repaired.
+  DEPLOYMENT_BACKUP_RETENTION_DAYS: "14"
+
+  # --- provider model defaults ---------------------------------------------
+  DASHSCOPE_API_BASE_URL: "https://dashscope.aliyuncs.com"
+  DASHSCOPE_AVATAR_MODEL: "wan2.2-s2v"
+  DASHSCOPE_AVATAR_RESOLUTION: "480P"
+  DASHSCOPE_AVATAR_DETECT_MODEL: "emo-detect-v1"
+  DASHSCOPE_AVATAR_RATIO: "3:4"
+  DASHSCOPE_TTS_MODEL: "qwen3-tts-flash"
+  DASHSCOPE_IMAGE_MODEL: "qwen-image-2.0-pro"
+  DASHSCOPE_IMAGE_SIZE: "1024*1024"
+
+---
+# A template, not a manifest. The keys below are exactly what the deployment
+# needs and nothing more; the values are placeholders that must never reach a real
+# cluster. Prefer creating the Secret out of band (see the header) so that no
+# filled-in copy of this file ever exists on disk.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s2v-secrets
+  namespace: s2v-studio
+type: Opaque
+stringData:
+  # In-cluster MySQL, or a managed instance. Keep the charset — the schema uses
+  # utf8mb4 for the event payloads and asset metadata.
+  DATABASE_URL: "mysql+pymysql://CHANGE_ME:CHANGE_ME@mysql:3306/CHANGE_ME?charset=utf8mb4"
+  REDIS_URL: "redis://redis:6379/0"
+
+  # Signs asset access links. The development default ("dev-only-change-me") is
+  # refused outside local environments, so an unset value does not fail silently:
+  # it fails the first time anyone mints a link.
+  ASSET_LINK_SECRET: "REPLACE_WITH_openssl_rand_base64_32"
+  # Optional. Setting it moves provider secrets into `encrypted_secrets` as
+  # AES-256-GCM ciphertext; leaving it empty keeps the previous behaviour exactly.
+  # Rotating it requires POST /api/provider-credentials/{id}/rotate per credential.
+  SECRET_ENCRYPTION_KEY: "REPLACE_WITH_openssl_rand_base64_32"
+  # Mixed into the API key digest. Changing it invalidates every issued key.
+  API_KEY_PEPPER: "REPLACE_WITH_openssl_rand_base64_32"
+  # Signs embed links. Changing it invalidates every link currently in flight.
+  EMBED_TOKEN_SECRET: "REPLACE_WITH_openssl_rand_base64_32"
+  # Optional. When set, provider callbacks must carry a valid X-S2V-Signature.
+  PROVIDER_CALLBACK_SECRET: "REPLACE_WITH_openssl_rand_base64_32"
+
+  # Provider credentials are deliberately *not* here. Create them through
+  # POST /api/provider-credentials once the deployment is up: that path stores
+  # them encrypted at rest (V8.4) and keeps them out of the manifest history,
+  # where a key would outlive every rotation.

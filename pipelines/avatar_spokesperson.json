@@ -1,0 +1,24 @@
+{
+  "extends": "spokesperson_ad",
+  "pipeline_key": "avatar_spokesperson",
+  "display_name": "Avatar Spokesperson",
+  "description": "Create avatar-led videos for brand ads, knowledge explainers, product introductions, and commerce scripts.",
+  "version": "0.4.0",
+  "category": "avatar_spokesperson",
+  "status": "production",
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V3.1",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/avatar_spokesperson.md",
+    "legacy_pipeline_key": "spokesperson_ad",
+    "supported_use_cases": [
+      "brand_ad",
+      "knowledge_spokesperson",
+      "product_intro",
+      "commerce_short_video"
+    ],
+    "formalized_from": "spokesperson_ad",
+    "migration_policy": "New runs should use avatar_spokesperson; existing spokesperson_ad runs remain supported."
+  }
+}

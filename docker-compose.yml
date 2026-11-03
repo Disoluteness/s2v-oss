@@ -1,0 +1,89 @@
+x-dashscope-provider-defaults: &dashscope-provider-defaults
+  DASHSCOPE_API_BASE_URL: ${DASHSCOPE_API_BASE_URL:-https://dashscope.aliyuncs.com}
+  DASHSCOPE_AVATAR_MODEL: ${DASHSCOPE_AVATAR_MODEL:-wan2.2-s2v}
+  DASHSCOPE_AVATAR_RESOLUTION: ${DASHSCOPE_AVATAR_RESOLUTION:-480P}
+  DASHSCOPE_AVATAR_DETECT_MODEL: ${DASHSCOPE_AVATAR_DETECT_MODEL:-emo-detect-v1}
+  DASHSCOPE_AVATAR_RATIO: ${DASHSCOPE_AVATAR_RATIO:-3:4}
+  DASHSCOPE_TTS_MODEL: ${DASHSCOPE_TTS_MODEL:-qwen3-tts-flash}
+  DASHSCOPE_IMAGE_MODEL: ${DASHSCOPE_IMAGE_MODEL:-qwen-image-2.0-pro}
+  DASHSCOPE_IMAGE_SIZE: ${DASHSCOPE_IMAGE_SIZE:-1024*1024}
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: script2video
+      MYSQL_USER: script2video
+      MYSQL_PASSWORD: script2video
+      MYSQL_ROOT_PASSWORD: script2video-root
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # 全新卷首次初始化约 20-30s；没有它 worker 会在 MySQL 就绪前启动并连库崩溃
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    command: ["python", "-m", "apps.worker.background_jobs"]
+    env_file:
+      - .env
+    environment:
+      <<: *dashscope-provider-defaults
+    volumes:
+      - ./storage:/app/storage
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+volumes:
+  mysql_data:
+  minio_data:

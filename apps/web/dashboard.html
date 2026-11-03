@@ -1,0 +1,1200 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio 项目仪表盘</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0 12px;
+      }
+
+      button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      button.subtle {
+        background: var(--panel-soft);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        outline: none;
+      }
+
+      input,
+      select {
+        height: 36px;
+        padding: 0 10px;
+      }
+
+      textarea {
+        min-height: 64px;
+        padding: 8px 10px;
+        resize: vertical;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        padding: 18px 16px;
+        overflow: auto;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 18px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.2;
+      }
+
+      .brand span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .create-project {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        margin-bottom: 16px;
+      }
+
+      .create-project label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .project-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .project-button {
+        height: auto;
+        min-height: 72px;
+        display: grid;
+        gap: 6px;
+        text-align: left;
+        padding: 10px;
+        border-radius: 8px;
+      }
+
+      .project-button.active {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .project-title {
+        font-weight: 700;
+      }
+
+      .project-meta {
+        display: flex;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        flex-wrap: wrap;
+      }
+
+      main {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(8px);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+
+      .title-block {
+        min-width: 0;
+      }
+
+      .title-block h2 {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+
+      .title-block p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(180px, 300px) 160px auto auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .status-line {
+        min-height: 30px;
+        padding: 6px 16px;
+        border-bottom: 1px solid var(--border);
+        color: var(--muted);
+        background: #fff;
+      }
+
+      .status-line.warn {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .status-line.error {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 16px;
+        padding: 16px;
+        min-height: 0;
+      }
+
+      .main-column,
+      .side-column {
+        display: grid;
+        gap: 16px;
+        align-content: start;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-header h3 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+        min-width: 0;
+      }
+
+      .metric.warn {
+        border-color: #f0c77c;
+        background: var(--amber-soft);
+      }
+
+      .metric.bad {
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+      }
+
+      .metric.bad strong {
+        color: var(--red);
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        background: var(--panel-soft);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .run-id {
+        font-weight: 700;
+        word-break: break-all;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--panel-soft);
+        white-space: nowrap;
+      }
+
+      .pill.good {
+        color: var(--green);
+        background: var(--green-soft);
+        border-color: #a9e2be;
+      }
+
+      .pill.warn {
+        color: var(--amber);
+        background: var(--amber-soft);
+        border-color: #f0c77c;
+      }
+
+      .pill.bad {
+        color: var(--red);
+        background: var(--red-soft);
+        border-color: #f0b0b0;
+      }
+
+      .pill.info {
+        color: var(--blue);
+        background: var(--blue-soft);
+        border-color: #b5ccff;
+      }
+
+      .pill.purple {
+        color: var(--purple);
+        background: var(--purple-soft);
+        border-color: #c9befa;
+      }
+
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .queue-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .queue-item {
+        display: grid;
+        gap: 6px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--panel-soft);
+      }
+
+      .queue-item strong {
+        word-break: break-all;
+      }
+
+      .queue-item.overdue {
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+      }
+
+      .queue-item.invalidated {
+        border-color: #f0c77c;
+        background: var(--amber-soft);
+      }
+
+      .queue-toolbar {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .queue-toolbar .filter-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .queue-toolbar label.checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+
+      .queue-toolbar label.checkbox input {
+        width: auto;
+        height: auto;
+      }
+
+      .queue-item .queue-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .queue-item .queue-actions button {
+        height: 28px;
+        padding: 0 9px;
+        font-size: 12px;
+      }
+
+      .queue-item .queue-actions button.danger {
+        border-color: #f0b0b0;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .queue-summary {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 24px 12px;
+      }
+
+      @media (max-width: 1180px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        th:nth-child(4),
+        td:nth-child(4),
+        th:nth-child(5),
+        td:nth-child(5) {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Script2Video Studio</h1>
+          <span>项目仪表盘</span>
+        </div>
+
+        <form id="createProjectForm" class="create-project">
+          <label for="projectTitleInput">新建项目</label>
+          <input id="projectTitleInput" name="title" placeholder="项目名称" />
+          <textarea id="projectDescriptionInput" name="description" placeholder="项目说明"></textarea>
+          <button class="primary" type="submit">创建项目</button>
+        </form>
+
+        <div class="project-list" id="projectList"></div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div class="title-block">
+            <h2 id="projectTitle">选择项目</h2>
+            <p id="projectDescription">加载项目后可查看 run、失败任务和待审核队列。</p>
+          </div>
+          <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="搜索 run、品牌、产品、脚本" />
+            <select id="statusFilter">
+              <option value="">全部状态</option>
+              <option value="draft">草稿</option>
+              <option value="queued">已排队</option>
+              <option value="running">运行中</option>
+              <option value="waiting_review">待审核</option>
+              <option value="paused">已暂停</option>
+              <option value="completed">已完成</option>
+              <option value="failed">失败</option>
+              <option value="cancelled">已取消</option>
+            </select>
+            <button id="refreshButton" type="button">刷新</button>
+            <button id="openWorkspaceButton" class="subtle" type="button">打开工作台</button>
+            <button id="openAssetLibraryButton" class="subtle" type="button">打开资产库</button>
+            <button id="openTeamButton" class="subtle" type="button">团队与权限</button>
+          </div>
+        </header>
+
+        <div id="statusLine" class="status-line">准备加载项目。</div>
+
+        <section class="content">
+          <div class="main-column">
+            <div class="metrics" id="metricsGrid"></div>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>Run 列表</h3>
+                <span id="runCountBadge" class="pill">0 条</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Run</th>
+                      <th>状态</th>
+                      <th>内容</th>
+                      <th>阶段</th>
+                      <th>任务</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="runTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <aside class="side-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>审核收件箱</h3>
+                <span id="reviewCountBadge" class="pill warn">0</span>
+              </div>
+              <div class="panel-body">
+                <div class="queue-toolbar">
+                  <div class="filter-row">
+                    <label class="checkbox">
+                      <input id="reviewMineOnly" type="checkbox" />
+                      只看我的
+                    </label>
+                    <input id="reviewAssigneeInput" placeholder="当前审核人 user_id" />
+                    <button id="reviewInboxRefresh" class="subtle" type="button">刷新</button>
+                  </div>
+                  <div id="reviewQueueSummary" class="queue-summary">按逾期优先排序。</div>
+                </div>
+                <div id="reviewQueue" class="queue-list"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>失败任务聚合</h3>
+                <span id="failedJobCountBadge" class="pill bad">0</span>
+              </div>
+              <div class="panel-body">
+                <div id="failedJobs" class="queue-list"></div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        projects: [],
+        selectedProjectId: null,
+        dashboard: null,
+        loading: false,
+        reviewInbox: null,
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      const statusLabels = {
+        draft: "草稿",
+        queued: "已排队",
+        running: "运行中",
+        waiting_review: "待审核",
+        paused: "已暂停",
+        completed: "已完成",
+        failed: "失败",
+        cancelled: "已取消",
+      };
+
+      const stageLabels = {
+        intake: "接收",
+        plan: "规划",
+        script: "脚本",
+        storyboard: "分镜",
+        asset_generation: "素材生成",
+        asset_review: "素材审核",
+        edit: "剪辑",
+        compose: "合成",
+        final_review: "最终审核",
+        export: "导出",
+      };
+
+      const jobLabels = {
+        queued: "排队",
+        running: "运行",
+        waiting_provider: "等待服务商",
+        completed: "完成",
+        failed: "失败",
+        cancelled: "取消",
+      };
+
+      // Backend keys stay English; only the Web display layer is localized.
+      const reviewStatusLabels = {
+        open: "待审核",
+        approved: "已通过",
+        changes_requested: "要求修改",
+        rejected: "已驳回",
+        cancelled: "已取消",
+        superseded: "已作废",
+      };
+
+      const reviewDecisionLabels = {
+        approve: "通过",
+        approve_with_changes: "带修改通过",
+        request_changes: "要求修改",
+        reject: "驳回",
+        reopen: "重新打开",
+        cancel: "取消",
+      };
+
+      function reviewStatusLabel(status) {
+        return reviewStatusLabels[status] || status || "-";
+      }
+
+      // ``approve`` and ``approve_with_changes`` both close a request as
+      // approved; without the decision the inbox cannot tell them apart.
+      function reviewItemStatusLabel(item) {
+        if (item.status === "approved" && item.current_decision === "approve_with_changes") {
+          return "已通过（带修改）";
+        }
+        if (item.status === "open" && item.current_decision === "reopen") {
+          return "已重新打开";
+        }
+        return reviewStatusLabel(item.status);
+      }
+
+      function reviewDecisionLabel(decision) {
+        return reviewDecisionLabels[decision] || decision || "-";
+      }
+
+      function setStatus(message, tone = "") {
+        const line = $("statusLine");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            detail = body.detail || JSON.stringify(body);
+          } catch (error) {
+            detail = response.statusText;
+          }
+          throw new Error(detail);
+        }
+        return response.json();
+      }
+
+      async function loadProjects() {
+        setStatus("加载项目列表中", "warn");
+        state.projects = await api("/api/projects");
+        renderProjects();
+        if (!state.selectedProjectId && state.projects.length > 0) {
+          state.selectedProjectId = state.projects[0].project.project_id;
+        }
+        if (state.selectedProjectId) {
+          await loadDashboard();
+        } else {
+          renderEmptyDashboard();
+          setStatus("暂无项目，请先创建项目。");
+        }
+      }
+
+      async function loadDashboard() {
+        if (!state.selectedProjectId || state.loading) return;
+        state.loading = true;
+        try {
+          const params = new URLSearchParams();
+          const status = $("statusFilter").value;
+          const search = $("searchInput").value.trim();
+          if (status) params.set("status", status);
+          if (search) params.set("search", search);
+          params.set("limit", "80");
+          state.dashboard = await api(
+            `/api/projects/${state.selectedProjectId}/dashboard?${params.toString()}`,
+          );
+          renderDashboard();
+          setStatus("项目仪表盘已更新。");
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        } finally {
+          state.loading = false;
+        }
+      }
+
+      function renderProjects() {
+        const list = $("projectList");
+        if (!state.projects.length) {
+          list.innerHTML = '<div class="empty">暂无项目</div>';
+          return;
+        }
+        list.innerHTML = state.projects
+          .map((item) => {
+            const project = item.project;
+            return `
+              <button class="project-button ${project.project_id === state.selectedProjectId ? "active" : ""}" data-project-id="${project.project_id}" type="button">
+                <span class="project-title">${escapeHtml(project.title)}</span>
+                <span class="project-meta">
+                  <span>${item.run_count || 0} 个 run</span>
+                  <span>${statusLabel(item.latest_run_status) || "暂无任务"}</span>
+                </span>
+              </button>
+            `;
+          })
+          .join("");
+        list.querySelectorAll("[data-project-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.selectedProjectId = button.dataset.projectId;
+            renderProjects();
+            loadDashboard();
+          });
+        });
+      }
+
+      function renderDashboard() {
+        const dashboard = state.dashboard;
+        if (!dashboard) {
+          renderEmptyDashboard();
+          return;
+        }
+        $("projectTitle").textContent = dashboard.project.title;
+        $("projectDescription").textContent =
+          dashboard.project.description ||
+          `默认语言 ${dashboard.project.default_language}，画幅 ${dashboard.project.default_aspect_ratio}`;
+        renderMetrics(dashboard.metrics);
+        renderRuns(dashboard.runs || []);
+        // The review panel decides between the dashboard queue and the
+        // server-filtered review inbox ("只看我的").
+        loadReviewInbox();
+        renderFailedJobs(dashboard.failed_jobs || []);
+      }
+
+      function renderEmptyDashboard() {
+        $("projectTitle").textContent = "选择项目";
+        $("projectDescription").textContent =
+          "加载项目后可查看 run、失败任务和审核收件箱。";
+        $("metricsGrid").innerHTML = "";
+        $("runTableBody").innerHTML = '<tr><td colspan="6" class="empty">暂无数据</td></tr>';
+        $("reviewQueue").innerHTML = '<div class="empty">暂无待审核项</div>';
+        $("reviewQueueSummary").textContent = "按逾期优先排序。";
+        $("failedJobs").innerHTML = '<div class="empty">暂无失败任务</div>';
+      }
+
+      function renderMetrics(metrics) {
+        const items = [
+          ["全部 Run", metrics.total_runs],
+          ["进行中", metrics.active_runs],
+          ["待审核", metrics.pending_reviews],
+          ["逾期审核", metrics.overdue_reviews, (metrics.overdue_reviews || 0) > 0 ? "bad" : ""],
+          [
+            "失效阶段",
+            metrics.invalidated_stages,
+            (metrics.invalidated_stages || 0) > 0 ? "warn" : "",
+          ],
+          ["失败 Run", metrics.failed_runs],
+          ["失败任务", metrics.failed_jobs],
+          ["已完成", metrics.completed_runs],
+        ];
+        $("metricsGrid").innerHTML = items
+          .map(
+            ([label, value, tone]) =>
+              `<div class="metric ${tone || ""}"><strong>${value || 0}</strong><span>${label}</span></div>`,
+          )
+          .join("");
+      }
+
+      function renderRuns(runs) {
+        $("runCountBadge").textContent = `${runs.length} 条`;
+        if (!runs.length) {
+          $("runTableBody").innerHTML = '<tr><td colspan="6" class="empty">没有匹配的 run</td></tr>';
+          return;
+        }
+        $("runTableBody").innerHTML = runs
+          .map((run) => {
+            const stage = stageLabel(run.current_stage_key) || "-";
+            const content = [run.brand_name, run.product_name].filter(Boolean).join(" · ");
+            const jobText = summarizeCounts(run.job_counts, jobLabels);
+            return `
+              <tr>
+                <td>
+                  <div class="run-id">${escapeHtml(run.run_id)}</div>
+                  <div class="muted">${escapeHtml(run.pipeline_key)} · ${formatDate(run.updated_at)}</div>
+                </td>
+                <td>${statusPill(run.status)}</td>
+                <td>
+                  <div>${escapeHtml(content || "未填写品牌/产品")}</div>
+                  <div class="muted">${escapeHtml(run.script_preview || "")}</div>
+                </td>
+                <td>
+                  <div>${escapeHtml(stage)}</div>
+                  <div class="muted">${summarizeCounts(run.stage_counts, stageLabels)}</div>
+                </td>
+                <td>
+                  <div>${escapeHtml(jobText || "暂无后台任务")}</div>
+                  <div class="muted">产物 ${run.artifact_count || 0} · 资产 ${run.asset_count || 0}</div>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button type="button" data-open-run="${run.run_id}">打开</button>
+                    <button type="button" data-board-run="${run.run_id}">看板</button>
+                    <button type="button" data-copy-run="${run.run_id}">复制</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+        $("runTableBody").querySelectorAll("[data-open-run]").forEach((button) => {
+          button.addEventListener("click", () => {
+            window.location.href = `/workspace?run_id=${button.dataset.openRun}`;
+          });
+        });
+        $("runTableBody").querySelectorAll("[data-board-run]").forEach((button) => {
+          button.addEventListener("click", () => {
+            window.location.href = `/run-board?run_id=${button.dataset.boardRun}`;
+          });
+        });
+        $("runTableBody").querySelectorAll("[data-copy-run]").forEach((button) => {
+          button.addEventListener("click", () => copyRun(button.dataset.copyRun));
+        });
+      }
+
+      function renderReviewQueue(items) {
+        const normalized = items.map(normalizeReviewItem);
+        const overdue = normalized.filter((item) => item.overdue).length;
+        const actionable = normalized.filter((item) => item.status === "open").length;
+        $("reviewCountBadge").textContent = String(normalized.length);
+        $("reviewCountBadge").className = `pill ${overdue ? "bad" : actionable ? "warn" : ""}`.trim();
+        $("reviewQueueSummary").textContent = normalized.length
+          ? `待处理 ${actionable} · 已逾期 ${overdue} · 按逾期优先排序`
+          : "按逾期优先排序。";
+
+        if (!normalized.length) {
+          $("reviewQueue").innerHTML = '<div class="empty">暂无待审核项</div>';
+          return;
+        }
+        $("reviewQueue").innerHTML = normalized
+          .map((item) => {
+            const canDecide = Boolean(item.review_request_id) && item.status === "open";
+            const meta = [
+              stageLabel(item.stage_key),
+              item.iteration ? `第 ${item.iteration} 轮` : null,
+              reviewItemStatusLabel(item),
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const owner = item.assignee_user_id
+              ? `审核人 ${item.assignee_user_id}`
+              : "未指派审核人";
+            const due = item.due_at
+              ? `${item.overdue ? "已逾期" : "截止"} ${formatDate(item.due_at)}`
+              : "未设置截止时间";
+            const flags = [
+              item.overdue ? '<span class="pill bad">已逾期</span>' : "",
+              item.invalidated ? '<span class="pill warn">上游已变更</span>' : "",
+              item.open_critical_comments
+                ? `<span class="pill bad">严重评论 ${item.open_critical_comments}</span>`
+                : "",
+              item.open_action_items
+                ? `<span class="pill warn">待办 ${item.open_action_items}</span>`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            return `
+              <div class="queue-item ${item.overdue ? "overdue" : ""} ${item.invalidated ? "invalidated" : ""}">
+                <strong>${escapeHtml(item.run_id)}</strong>
+                <span>${escapeHtml(meta)}</span>
+                <span>${statusPill(item.stage_status)} ${flags}</span>
+                <span class="muted">${escapeHtml(owner)} · ${escapeHtml(due)}</span>
+                <div class="queue-actions">
+                  <button type="button" data-review-open="${escapeHtml(item.review_request_id || "")}" data-review-run="${escapeHtml(item.run_id)}">进入审核</button>
+                  <button type="button" data-quick-decision="approve" data-request-id="${escapeHtml(item.review_request_id || "")}" ${canDecide ? "" : "disabled"}>通过</button>
+                  <button type="button" class="danger" data-quick-decision="request_changes" data-request-id="${escapeHtml(item.review_request_id || "")}" ${canDecide ? "" : "disabled"}>要求修改</button>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+        $("reviewQueue").querySelectorAll("[data-review-open]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const requestId = button.dataset.reviewOpen;
+            window.location.href = requestId
+              ? `/run-board?review_request_id=${requestId}`
+              : `/workspace?run_id=${button.dataset.reviewRun}`;
+          });
+        });
+        $("reviewQueue").querySelectorAll("[data-quick-decision]").forEach((button) => {
+          button.addEventListener("click", () =>
+            submitQuickDecision(button.dataset.requestId, button.dataset.quickDecision),
+          );
+        });
+      }
+
+      /**
+       * The project dashboard and the review inbox carry slightly different
+       * shapes; the panel renders one normalized view.
+       */
+      function normalizeReviewItem(item) {
+        return {
+          run_id: item.run_id,
+          stage_key: item.stage_key,
+          stage_status: item.stage_status || "waiting_review",
+          review_request_id: item.review_request_id || null,
+          iteration: item.iteration || null,
+          status: item.review_status || item.status || "open",
+          current_decision: item.current_decision || null,
+          assignee_user_id: item.assignee_user_id || null,
+          due_at: item.due_at || null,
+          overdue: Boolean(item.overdue),
+          invalidated: Boolean(item.invalidated),
+          open_critical_comments: item.open_critical_comments || 0,
+          open_action_items: item.open_action_items || 0,
+          workspace_url: item.workspace_url || null,
+        };
+      }
+
+      async function loadReviewInbox() {
+        if (!state.selectedProjectId || !$("reviewMineOnly").checked) {
+          state.reviewInbox = null;
+          renderReviewQueue((state.dashboard && state.dashboard.review_queue) || []);
+          return;
+        }
+        const assignee = $("reviewAssigneeInput").value.trim();
+        const params = new URLSearchParams();
+        if (assignee) params.set("assignee_user_id", assignee);
+        try {
+          state.reviewInbox = await api(
+            `/api/projects/${state.selectedProjectId}/review-inbox?${params.toString()}`,
+          );
+          renderReviewQueue(state.reviewInbox.items || []);
+        } catch (error) {
+          setStatus(`收件箱加载失败：${error.message}`, "error");
+        }
+      }
+
+      async function submitQuickDecision(reviewRequestId, decision) {
+        if (!reviewRequestId) return;
+        setStatus(`提交审核决策：${reviewDecisionLabel(decision)}`, "warn");
+        try {
+          await api(`/api/review-requests/${reviewRequestId}/decisions`, {
+            method: "POST",
+            body: JSON.stringify({ decision }),
+          });
+          // loadDashboard re-renders the panel, which re-resolves the inbox.
+          await loadDashboard();
+          setStatus("审核决策已记录");
+        } catch (error) {
+          setStatus(`提交失败：${error.message}`, "error");
+        }
+      }
+
+      function renderFailedJobs(items) {
+        $("failedJobCountBadge").textContent = String(items.length);
+        if (!items.length) {
+          $("failedJobs").innerHTML = '<div class="empty">暂无失败任务</div>';
+          return;
+        }
+        $("failedJobs").innerHTML = items
+          .map(
+            (job) => `
+              <div class="queue-item">
+                <strong>${escapeHtml(job.job_type)} · ${escapeHtml(job.job_id)}</strong>
+                <span>${statusPill(job.status)} <span class="muted">attempt ${job.attempt}/${job.max_attempts}</span></span>
+                <span class="muted">${escapeHtml(job.error_user_message || job.error_message || job.error_code || "无错误详情")}</span>
+                <button type="button" data-failed-run="${job.run_id}">打开 Run</button>
+              </div>
+            `,
+          )
+          .join("");
+        $("failedJobs").querySelectorAll("[data-failed-run]").forEach((button) => {
+          button.addEventListener("click", () => {
+            window.location.href = `/workspace?run_id=${button.dataset.failedRun}`;
+          });
+        });
+      }
+
+      async function copyRun(runId) {
+        try {
+          setStatus(`正在复制 ${runId}`, "warn");
+          const result = await api(`/api/runs/${runId}/copy`, {
+            method: "POST",
+            body: JSON.stringify({ copy_reason: "dashboard_copy" }),
+          });
+          setStatus(`已复制为 ${result.run.run_id}`);
+          await loadProjects();
+          window.location.href = result.workspace_url;
+        } catch (error) {
+          setStatus(`复制失败：${error.message}`, "error");
+        }
+      }
+
+      async function createProject(event) {
+        event.preventDefault();
+        const title = $("projectTitleInput").value.trim();
+        const description = $("projectDescriptionInput").value.trim();
+        if (!title) {
+          setStatus("请填写项目名称。", "error");
+          return;
+        }
+        try {
+          const project = await api("/api/projects", {
+            method: "POST",
+            body: JSON.stringify({ title, description: description || null }),
+          });
+          $("projectTitleInput").value = "";
+          $("projectDescriptionInput").value = "";
+          state.selectedProjectId = project.project_id;
+          await loadProjects();
+        } catch (error) {
+          setStatus(`创建项目失败：${error.message}`, "error");
+        }
+      }
+
+      function statusPill(status) {
+        const tone = {
+          completed: "good",
+          approved: "good",
+          succeeded: "good",
+          failed: "bad",
+          cancelled: "bad",
+          rejected: "bad",
+          superseded: "bad",
+          waiting_review: "warn",
+          changes_requested: "warn",
+          running: "info",
+          in_progress: "info",
+          queued: "purple",
+          waiting_provider: "warn",
+        }[status] || "";
+        return `<span class="pill ${tone}">${escapeHtml(statusLabel(status))}</span>`;
+      }
+
+      function statusLabel(status) {
+        return (
+          statusLabels[status] ||
+          jobLabels[status] ||
+          reviewStatusLabels[status] ||
+          status ||
+          ""
+        );
+      }
+
+      function stageLabel(stage) {
+        return stageLabels[stage] || stage || "";
+      }
+
+      function summarizeCounts(counts, labels) {
+        if (!counts) return "";
+        return Object.entries(counts)
+          .filter(([, value]) => value)
+          .map(([key, value]) => `${labels[key] || key} ${value}`)
+          .join(" · ");
+      }
+
+      function formatDate(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString("zh-CN", { hour12: false });
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function debounce(fn, delay) {
+        let timer = null;
+        return (...args) => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => fn(...args), delay);
+        };
+      }
+
+      $("createProjectForm").addEventListener("submit", createProject);
+      $("refreshButton").addEventListener("click", loadDashboard);
+      $("openWorkspaceButton").addEventListener("click", () => {
+        const firstRun = state.dashboard?.runs?.[0];
+        window.location.href = firstRun ? firstRun.workspace_url : "/workspace";
+      });
+      $("openAssetLibraryButton").addEventListener("click", () => {
+        const projectId = state.selectedProjectId;
+        window.location.href = projectId
+          ? `/asset-library?project_id=${encodeURIComponent(projectId)}`
+          : "/asset-library";
+      });
+      $("openTeamButton").addEventListener("click", () => {
+        window.location.href = "/team";
+      });
+      $("statusFilter").addEventListener("change", loadDashboard);
+      $("searchInput").addEventListener("input", debounce(loadDashboard, 300));
+      $("reviewMineOnly").addEventListener("change", loadReviewInbox);
+      $("reviewInboxRefresh").addEventListener("click", loadReviewInbox);
+      $("reviewAssigneeInput").addEventListener("input", debounce(loadReviewInbox, 400));
+
+      loadProjects().catch((error) => {
+        setStatus(`加载失败：${error.message}`, "error");
+      });
+    </script>
+  </body>
+</html>

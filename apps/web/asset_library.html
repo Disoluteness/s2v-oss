@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio 资产库</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0 12px;
+      }
+
+      button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      button.subtle {
+        background: var(--panel-soft);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        outline: none;
+      }
+
+      input,
+      select {
+        height: 36px;
+        padding: 0 10px;
+      }
+
+      textarea {
+        min-height: 60px;
+        padding: 8px 10px;
+        resize: vertical;
+      }
+
+      a {
+        color: var(--blue);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        padding: 18px 16px;
+        overflow: auto;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 14px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.2;
+      }
+
+      .brand span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+        font-size: 12px;
+      }
+
+      .create-collection {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        margin-bottom: 16px;
+      }
+
+      .create-collection label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .collection-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .collection-button {
+        height: auto;
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--panel-soft);
+        display: grid;
+        gap: 4px;
+      }
+
+      .collection-button.active {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .collection-button strong {
+        font-size: 13px;
+      }
+
+      .collection-button small {
+        color: var(--muted);
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .title-block h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+
+      .title-block p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        min-width: 320px;
+      }
+
+      .toolbar select {
+        width: 220px;
+      }
+
+      .status-line {
+        padding: 10px 22px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel-soft);
+        font-size: 12px;
+      }
+
+      .status-line.warn {
+        color: var(--amber);
+      }
+
+      .status-line.error {
+        color: var(--red);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        padding: 18px 22px 32px;
+        align-items: start;
+      }
+
+      .main-column,
+      .side-column {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-header h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+      }
+
+      .pill.warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .pill.ok {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .pill.muted {
+        background: var(--panel-soft);
+        color: var(--muted);
+      }
+
+      .pill.violet {
+        background: var(--purple-soft);
+        color: var(--purple);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .form-grid .full {
+        grid-column: 1 / -1;
+      }
+
+      .form-grid label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        background: var(--panel-soft);
+        white-space: nowrap;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .row-actions button {
+        height: 28px;
+        padding: 0 8px;
+        font-size: 12px;
+      }
+
+      .empty {
+        padding: 24px 14px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 6px 10px;
+        font-size: 12px;
+      }
+
+      .kv dt {
+        color: var(--muted);
+      }
+
+      .kv dd {
+        margin: 0;
+        word-break: break-word;
+      }
+
+      .legend {
+        display: grid;
+        gap: 6px;
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .stack {
+        display: grid;
+        gap: 4px;
+      }
+
+      @media (max-width: 1180px) {
+        .shell,
+        .content {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Script2Video Studio</h1>
+          <span>资产库</span>
+        </div>
+
+        <div class="nav-links">
+          <a href="/dashboard">项目仪表盘</a>
+          <a href="/workspace">工作台</a>
+          <a href="/run-board">Run Board</a>
+        </div>
+
+        <form id="createCollectionForm" class="create-collection">
+          <label for="collectionKindInput">新建资产集合</label>
+          <select id="collectionKindInput" name="kind"></select>
+          <input id="collectionNameInput" name="name" placeholder="集合名称" />
+          <textarea
+            id="collectionDescriptionInput"
+            name="description"
+            placeholder="集合说明（可空）"
+          ></textarea>
+          <button class="primary" type="submit">创建集合</button>
+        </form>
+
+        <div class="collection-list" id="collectionList"></div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div class="title-block">
+            <h2 id="collectionTitle">资产库</h2>
+            <p id="collectionMeta">
+              项目资产库、品牌资产库、可复用人物形象 / 声音 / 音乐 / 片段，全部带来源与授权信息。
+            </p>
+          </div>
+          <div class="toolbar">
+            <select id="projectSelect" aria-label="选择项目"></select>
+            <button id="refreshButton" type="button">刷新</button>
+          </div>
+        </header>
+
+        <div id="statusLine" class="status-line">准备加载资产库。</div>
+
+        <section class="content">
+          <div class="main-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>从 Run 沉淀资产</h3>
+                <span class="pill muted" id="importTargetBadge">未选择集合</span>
+              </div>
+              <div class="panel-body">
+                <form id="importForm" class="form-grid">
+                  <div>
+                    <label for="importRunInput">来源 Run</label>
+                    <input id="importRunInput" placeholder="run_xxxxxxxx" />
+                  </div>
+                  <div>
+                    <label for="importAssetTypeInput">资产类型（可空，逗号分隔）</label>
+                    <input id="importAssetTypeInput" placeholder="avatar_video, narration_audio" />
+                  </div>
+                  <div>
+                    <label for="importRoleInput">用途角色</label>
+                    <input id="importRoleInput" placeholder="person_image / voice / music / clip" />
+                  </div>
+                  <div>
+                    <label for="importLicenseInput">授权类型</label>
+                    <select id="importLicenseInput"></select>
+                  </div>
+                  <div class="full">
+                    <label for="importNoteInput">备注（可空）</label>
+                    <input id="importNoteInput" placeholder="例如：本次直播用形象，已获肖像授权" />
+                  </div>
+                  <div class="full">
+                    <button class="primary" type="submit">沉淀到当前集合</button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>资产条目</h3>
+                <span class="pill" id="itemCountBadge">0 条</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>资产</th>
+                      <th>角色</th>
+                      <th>来源</th>
+                      <th>授权</th>
+                      <th>备注</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="itemTableBody"></tbody>
+                </table>
+              </div>
+              <div id="itemEmpty" class="empty">当前集合还没有条目。</div>
+            </section>
+          </div>
+
+          <aside class="side-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>复用到 Run</h3>
+                <span class="pill violet">可复用</span>
+              </div>
+              <div class="panel-body">
+                <form id="reuseForm" class="stack">
+                  <div>
+                    <label for="reuseItemSelect">资产条目</label>
+                    <select id="reuseItemSelect"></select>
+                  </div>
+                  <div>
+                    <label for="reuseRunInput">目标 Run</label>
+                    <input id="reuseRunInput" placeholder="run_xxxxxxxx" />
+                  </div>
+                  <div>
+                    <button class="primary" type="submit">复用为新资产</button>
+                  </div>
+                </form>
+                <p class="muted" style="font-size: 12px; margin: 10px 0 0">
+                  复用不会复制文件，只在目标 Run 下生成一条指向同一素材的资产记录，并带上来源与授权。
+                </p>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>库统计</h3>
+                <span class="pill muted" id="collectionKindBadge">-</span>
+              </div>
+              <div class="panel-body">
+                <dl class="kv" id="statsList"></dl>
+                <div class="legend">
+                  <span>来源：上传 / 生成 / 复用导入</span>
+                  <span>授权：自有 / 已授权 / 委托制作 / CC0 / 未标注</span>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const collectionKinds = [
+        ["project_asset", "项目资产"],
+        ["brand_asset", "品牌资产"],
+        ["person", "人物形象"],
+        ["voice", "声音"],
+        ["music", "音乐"],
+        ["clip", "素材片段"],
+      ];
+
+      const licenseTypes = [
+        ["owned", "自有"],
+        ["licensed", "已授权"],
+        ["commissioned", "委托制作"],
+        ["cc0", "CC0"],
+        ["unknown", "未标注"],
+      ];
+
+      const sourceLabels = {
+        uploaded: "上传",
+        generated: "生成",
+        imported: "复用导入",
+      };
+
+      const state = {
+        projectId: null,
+        collectionId: null,
+        library: null,
+        loading: false,
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      function optionList(select, entries, extraFirst) {
+        const options = [];
+        if (extraFirst) {
+          options.push(extraFirst);
+        }
+        for (const [value, label] of entries) {
+          options.push(`<option value="${value}">${label}</option>`);
+        }
+        select.innerHTML = options.join("");
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function kindLabel(kind) {
+        const entry = collectionKinds.find((item) => item[0] === kind);
+        return entry ? entry[1] : kind || "-";
+      }
+
+      function licenseLabel(item) {
+        const license = item.license || {};
+        const entry = licenseTypes.find((candidate) => candidate[0] === license.license_type);
+        return entry ? entry[1] : license.license_type || "未标注";
+      }
+
+      function sourceLabel(item) {
+        const provenance = item.provenance || {};
+        return sourceLabels[provenance.source] || provenance.source || "未知";
+      }
+
+      function setStatus(message, tone = "") {
+        const line = $("statusLine");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            if (body && typeof body.detail === "string") {
+              detail = body.detail;
+            } else if (body && body.detail) {
+              detail = JSON.stringify(body.detail);
+            } else {
+              detail = JSON.stringify(body);
+            }
+          } catch (error) {
+            detail = response.statusText;
+          }
+          throw new Error(detail);
+        }
+        return response.json();
+      }
+
+      function formatBytes(size) {
+        if (typeof size !== "number" || size <= 0) return "-";
+        const units = ["B", "KB", "MB", "GB"];
+        let value = size;
+        let index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+          value /= 1024;
+          index += 1;
+        }
+        return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+      }
+
+      async function loadProjects() {
+        const projects = await api("/api/projects");
+        const entries = projects.map((entry) => [
+          entry.project.project_id,
+          entry.project.title || entry.project.project_id,
+        ]);
+        if (!entries.length) {
+          setStatus("暂无可选项目，请先在项目仪表盘创建项目。", "warn");
+          optionList($("projectSelect"), []);
+          renderLibrary();
+          return;
+        }
+        optionList($("projectSelect"), entries);
+        const fromQuery = new URLSearchParams(location.search).get("project_id");
+        const known = entries.some((entry) => entry[0] === fromQuery);
+        state.projectId = known ? fromQuery : entries[0][0];
+        $("projectSelect").value = state.projectId;
+        await loadLibrary();
+      }
+
+      async function loadLibrary() {
+        if (!state.projectId || state.loading) return;
+        state.loading = true;
+        try {
+          state.library = await api(`/api/projects/${state.projectId}/asset-library`);
+          const fromQuery = new URLSearchParams(location.search).get("collection_id");
+          const collections = state.library.collections || [];
+          const match = collections.find((item) => item.collection_id === fromQuery);
+          const current = collections.find((item) => item.collection_id === state.collectionId);
+          state.collectionId = (match || current || collections[0] || {}).collection_id || null;
+          renderCollections();
+          renderLibrary();
+          setStatus("资产库已更新。");
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        } finally {
+          state.loading = false;
+        }
+      }
+
+      function renderCollections() {
+        const list = $("collectionList");
+        const collections = (state.library && state.library.collections) || [];
+        if (!collections.length) {
+          list.innerHTML = '<div class="empty">还没有资产集合，先在左上角新建一个。</div>';
+          return;
+        }
+        list.innerHTML = collections
+          .map((collection) => {
+            const active = collection.collection_id === state.collectionId ? " active" : "";
+            return `<button type="button" class="collection-button${active}" data-collection="${
+              collection.collection_id
+            }">
+              <strong>${escapeHtml(collection.name)}</strong>
+              <small>${escapeHtml(kindLabel(collection.kind))} · ${
+                collection.item_count
+              } 个条目</small>
+            </button>`;
+          })
+          .join("");
+        list.querySelectorAll("[data-collection]").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.collectionId = button.dataset.collection;
+            renderCollections();
+            renderLibrary();
+          });
+        });
+      }
+
+      function currentCollection() {
+        const collections = (state.library && state.library.collections) || [];
+        return collections.find((item) => item.collection_id === state.collectionId) || null;
+      }
+
+      function renderLibrary() {
+        const collection = currentCollection();
+        const items = collection ? collection.items || [] : [];
+
+        $("collectionTitle").textContent = collection ? collection.name : "资产库";
+        $("collectionMeta").textContent = collection
+          ? `${kindLabel(collection.kind)} · ${collection.description || "无说明"}`
+          : "项目资产库、品牌资产库、可复用人物形象 / 声音 / 音乐 / 片段，全部带来源与授权信息。";
+        $("importTargetBadge").textContent = collection ? collection.collection_id : "未选择集合";
+        $("collectionKindBadge").textContent = collection ? kindLabel(collection.kind) : "-";
+        $("itemCountBadge").textContent = `${items.length} 条`;
+
+        const totals = (state.library && state.library.totals) || {};
+        const byKind = totals.by_kind || {};
+        $("statsList").innerHTML = [
+          ["集合数量", totals.collection_count ?? 0],
+          ["条目总数", totals.item_count ?? 0],
+          ...collectionKinds
+            .filter(([kind]) => byKind[kind])
+            .map(([kind, label]) => [`${label}集合`, byKind[kind]]),
+        ]
+          .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+          .join("");
+
+        renderItems(items);
+        renderReuseSelect(items);
+      }
+
+      function renderItems(items) {
+        const body = $("itemTableBody");
+        $("itemEmpty").style.display = items.length ? "none" : "block";
+        body.innerHTML = items
+          .map((item) => {
+            const asset = item.asset || {};
+            const provenance = item.provenance || {};
+            const license = item.license || {};
+            const originParts = [sourceLabel(item)];
+            if (provenance.provider) originParts.push(provenance.provider);
+            if (provenance.source_run_id) originParts.push(provenance.source_run_id);
+            const licenseParts = [licenseLabel(item)];
+            if (license.holder) licenseParts.push(license.holder);
+            if (license.usage_scope) licenseParts.push(license.usage_scope);
+            return `<tr>
+              <td>
+                <div class="stack">
+                  <span class="mono">${escapeHtml(asset.asset_id || item.asset_id)}</span>
+                  <span class="muted">${escapeHtml(asset.asset_type || "-")} · ${escapeHtml(
+                    asset.mime_type || "-",
+                  )} · ${formatBytes(asset.file_size)}</span>
+                  <span class="muted">Run ${escapeHtml(asset.run_id || "-")}</span>
+                </div>
+              </td>
+              <td>${escapeHtml(item.role)}</td>
+              <td><div class="stack">${originParts
+                .map((part) => `<span>${escapeHtml(part)}</span>`)
+                .join("")}</div></td>
+              <td><div class="stack">${licenseParts
+                .map((part) => `<span>${escapeHtml(part)}</span>`)
+                .join("")}</div></td>
+              <td>${escapeHtml(item.note || "-")}</td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" data-download="${escapeHtml(item.asset_id)}">下载</button>
+                  <button type="button" class="subtle" data-remove="${escapeHtml(item.item_id)}">移除</button>
+                </div>
+              </td>
+            </tr>`;
+          })
+          .join("");
+
+        body.querySelectorAll("[data-download]").forEach((button) => {
+          button.addEventListener("click", () => {
+            window.open(`/api/assets/${button.dataset.download}/download`, "_blank");
+          });
+        });
+        body.querySelectorAll("[data-remove]").forEach((button) => {
+          button.addEventListener("click", () => removeItem(button.dataset.remove));
+        });
+      }
+
+      function renderReuseSelect(items) {
+        const select = $("reuseItemSelect");
+        if (!items.length) {
+          select.innerHTML = '<option value="">当前集合暂无条目</option>';
+          return;
+        }
+        select.innerHTML = items
+          .map(
+            (item) =>
+              `<option value="${item.item_id}">${escapeHtml(item.role)} · ${escapeHtml(
+                item.asset_id,
+              )}</option>`,
+          )
+          .join("");
+      }
+
+      async function createCollection(event) {
+        event.preventDefault();
+        if (!state.projectId) return;
+        const name = $("collectionNameInput").value.trim();
+        if (!name) {
+          setStatus("请先填写集合名称。", "warn");
+          return;
+        }
+        try {
+          const created = await api(`/api/projects/${state.projectId}/asset-collections`, {
+            method: "POST",
+            body: JSON.stringify({
+              name,
+              kind: $("collectionKindInput").value,
+              description: $("collectionDescriptionInput").value.trim() || null,
+            }),
+          });
+          state.collectionId = created.collection_id;
+          $("collectionNameInput").value = "";
+          $("collectionDescriptionInput").value = "";
+          await loadLibrary();
+          setStatus(`集合「${created.name}」已创建。`);
+        } catch (error) {
+          setStatus(`创建失败：${error.message}`, "error");
+        }
+      }
+
+      async function importFromRun(event) {
+        event.preventDefault();
+        if (!state.collectionId) {
+          setStatus("请先新建或选择一个资产集合。", "warn");
+          return;
+        }
+        const runId = $("importRunInput").value.trim();
+        if (!runId) {
+          setStatus("请先填写来源 Run。", "warn");
+          return;
+        }
+        const assetTypes = $("importAssetTypeInput")
+          .value.split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+        try {
+          const result = await api(
+            `/api/asset-collections/${state.collectionId}/import-from-run`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                run_id: runId,
+                asset_types: assetTypes,
+                role: $("importRoleInput").value.trim() || "reference",
+                note: $("importNoteInput").value.trim() || null,
+                license: { license_type: $("importLicenseInput").value },
+              }),
+            },
+          );
+          await loadLibrary();
+          setStatus(
+            `已从 ${runId} 沉淀 ${result.imported_count} 个资产，跳过 ${
+              result.skipped_asset_ids.length
+            } 个已在库中的资产。`,
+          );
+        } catch (error) {
+          setStatus(`沉淀失败：${error.message}`, "error");
+        }
+      }
+
+      async function removeItem(itemId) {
+        try {
+          await api(`/api/asset-library/items/${itemId}`, { method: "DELETE" });
+          await loadLibrary();
+          setStatus("条目已移除（保留审计记录）。");
+        } catch (error) {
+          setStatus(`移除失败：${error.message}`, "error");
+        }
+      }
+
+      async function reuseIntoRun(event) {
+        event.preventDefault();
+        const itemId = $("reuseItemSelect").value;
+        const runId = $("reuseRunInput").value.trim();
+        if (!itemId || !runId) {
+          setStatus("请选择条目并填写目标 Run。", "warn");
+          return;
+        }
+        try {
+          const result = await api(`/api/runs/${runId}/asset-library/reuse`, {
+            method: "POST",
+            body: JSON.stringify({ item_id: itemId }),
+          });
+          setStatus(
+            `已复用为 ${runId} 的资产 ${result.asset.asset_id}（授权：${licenseLabel(result)}）。`,
+          );
+        } catch (error) {
+          setStatus(`复用失败：${error.message}`, "error");
+        }
+      }
+
+      function boot() {
+        optionList($("collectionKindInput"), collectionKinds);
+        optionList($("importLicenseInput"), licenseTypes);
+        optionList($("projectSelect"), []);
+        $("createCollectionForm").addEventListener("submit", createCollection);
+        $("importForm").addEventListener("submit", importFromRun);
+        $("reuseForm").addEventListener("submit", reuseIntoRun);
+        $("refreshButton").addEventListener("click", () => loadProjects());
+        $("projectSelect").addEventListener("change", () => {
+          state.projectId = $("projectSelect").value;
+          state.collectionId = null;
+          loadLibrary();
+        });
+        loadProjects().catch((error) => setStatus(`初始化失败：${error.message}`, "error"));
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

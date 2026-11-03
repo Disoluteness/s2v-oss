@@ -1,0 +1,304 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "hybrid_story",
+  "display_name": "Hybrid Story",
+  "description": "Combine user-provided footage and assets with AI-generated supplemental material into one composed story video.",
+  "version": "0.1.0",
+  "category": "hybrid_story",
+  "status": "beta",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": ["douyin", "xiaohongshu", "bilibili", "wechat_channels", "generic"],
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "required_capabilities": ["asset_ingestion", "media_analysis", "video_composition", "storage"],
+  "optional_capabilities": ["llm_generation", "image_generation", "video_generation", "tts", "music_generation", "subtitle_generation", "audio_processing"],
+  "artifact_contracts": {
+    "intake_brief": {"schema_key": "intake_brief.v1", "description": "Normalized story goal, user asset references, platform, and format."},
+    "story_outline": {"schema_key": "story_outline.v1", "description": "Story beats plus the split between user assets and AI supplemental assets."},
+    "shot_list": {"schema_key": "shot_list.v1", "description": "Shot-level plan mapping every beat to a user asset or a generated asset."},
+    "source_asset_manifest": {"schema_key": "source_asset_manifest.v1", "description": "Ingested and analyzed user assets."},
+    "asset_manifest": {"schema_key": "asset_manifest.v1", "description": "Generated supplemental media assets."},
+    "review_notes": {"schema_key": "review_notes.v1", "description": "Human review outcome and requested changes."},
+    "edit_plan": {"schema_key": "edit_plan.v1", "description": "Timeline, mix, subtitles, and composition intent."},
+    "render_summary": {"schema_key": "render_summary.v1", "description": "Final render metadata and asset pointer."},
+    "publish_package": {"schema_key": "publish_package.v1", "description": "Downloadable final package and access links."}
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V3.6",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/hybrid_story.md",
+    "supported_use_cases": [
+      "user_footage_story",
+      "ugc_remix",
+      "brand_asset_story",
+      "event_recap"
+    ],
+    "hybrid_maturity": "planned_provider_contract",
+    "migration_policy": "This beta pipeline validates hybrid orchestration and contracts before real supplemental-generation workers land in later versions."
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Story Intake",
+      "description": "Normalize the story goal, user asset references, platform, duration, and aspect ratio.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Brief preserves the story goal and user asset references.", "Platform, duration, and aspect ratio are normalized."],
+      "required_input_artifacts": [],
+      "output_artifact_types": ["intake_brief"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "story_plan",
+      "display_name": "Story Outline",
+      "description": "Create the story outline: ordered beats and the split between user assets and AI supplemental assets.",
+      "order": 2,
+      "depends_on_stage_keys": ["intake"],
+      "input_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "output_artifacts": [{"artifact_type": "story_outline", "schema_key": "story_outline.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["story structure", "beat order", "user asset coverage", "generation scope"],
+        "success_criteria": ["Every beat is covered by a user asset or an explicit generation request.", "Generation scope is bounded and named."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Outline lists beats with source split and narration intent."],
+      "required_input_artifacts": ["intake_brief"],
+      "output_artifact_types": ["story_outline"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "visual_plan",
+      "display_name": "Hybrid Storyboard",
+      "description": "Map every story beat to a shot backed by a user asset or a planned generated asset.",
+      "order": 3,
+      "depends_on_stage_keys": ["story_plan"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "story_outline", "schema_key": "story_outline.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "shot_list", "schema_key": "shot_list.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["shot sequence", "asset coverage", "visual pacing", "brand fit"],
+        "success_criteria": ["Every beat has a visual treatment.", "Shots fit the target platform and duration."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Shot list maps shots to story beats and names each shot's source."],
+      "required_input_artifacts": ["intake_brief", "story_outline"],
+      "output_artifact_types": ["shot_list"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "ingest",
+      "display_name": "User Asset Ingestion",
+      "description": "Ingest the referenced user assets and run media analysis so shots can bind to concrete sources.",
+      "order": 4,
+      "depends_on_stage_keys": ["visual_plan"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "source_asset_manifest", "schema_key": "source_asset_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "asset_ingestion", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "media_analysis", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Every referenced user asset is ingested or has an explicit failure record."],
+      "required_input_artifacts": ["intake_brief", "shot_list"],
+      "output_artifact_types": ["source_asset_manifest"],
+      "required_capabilities": ["asset_ingestion", "media_analysis"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "supplement",
+      "display_name": "Supplemental Generation",
+      "description": "Generate the supplemental assets that the storyboard marked as AI-provided.",
+      "order": 5,
+      "depends_on_stage_keys": ["ingest"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "source_asset_manifest", "schema_key": "source_asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "image_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "video_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "tts", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "music_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Requested supplemental assets are queued or recorded with provider blockers."],
+      "required_input_artifacts": ["shot_list", "source_asset_manifest"],
+      "output_artifact_types": ["asset_manifest"],
+      "required_capabilities": [],
+      "optional_capabilities": ["image_generation", "video_generation", "tts", "music_generation"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "asset_review",
+      "display_name": "Hybrid Asset Review",
+      "description": "Review combined user and generated assets before edit planning.",
+      "order": 6,
+      "depends_on_stage_keys": ["supplement"],
+      "input_artifacts": [
+        {"artifact_type": "source_asset_manifest", "schema_key": "source_asset_manifest.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["user asset quality", "generated asset fit", "style consistency", "coverage of beats"],
+        "success_criteria": ["Reviewer approves the combined asset set or records concrete repair requests."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes capture approval or concrete repair requests."],
+      "required_input_artifacts": ["source_asset_manifest", "asset_manifest"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Hybrid Edit Plan",
+      "description": "Create the timeline that stitches user assets and generated assets, with subtitles and audio mix intent.",
+      "order": 7,
+      "depends_on_stage_keys": ["asset_review"],
+      "input_artifacts": [
+        {"artifact_type": "shot_list", "schema_key": "shot_list.v1"},
+        {"artifact_type": "source_asset_manifest", "schema_key": "source_asset_manifest.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "subtitle_generation", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Edit plan identifies selected assets, timing, subtitles, and audio mix intent."],
+      "required_input_artifacts": ["shot_list", "source_asset_manifest", "asset_manifest", "review_notes"],
+      "output_artifact_types": ["edit_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": ["subtitle_generation", "audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "compose",
+      "display_name": "Compose Hybrid Story",
+      "description": "Render the story video from user assets, generated assets, subtitles, and narration.",
+      "order": 8,
+      "depends_on_stage_keys": ["edit"],
+      "input_artifacts": [
+        {"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"},
+        {"artifact_type": "source_asset_manifest", "schema_key": "source_asset_manifest.v1"},
+        {"artifact_type": "asset_manifest", "schema_key": "asset_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["A rendered video asset exists and matches target profile."],
+      "required_input_artifacts": ["edit_plan", "source_asset_manifest", "asset_manifest"],
+      "output_artifact_types": ["render_summary"],
+      "required_capabilities": ["video_composition"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Final Story Review",
+      "description": "Human review of the rendered story before export.",
+      "order": 9,
+      "depends_on_stage_keys": ["compose"],
+      "input_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["story coherence", "asset transitions", "subtitle fit", "audio mix"],
+        "success_criteria": ["Final render is approved for export or concrete revisions are recorded."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes record approval or requested fixes."],
+      "required_input_artifacts": ["render_summary"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "render_summary_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "export",
+      "display_name": "Export Story Package",
+      "description": "Create the final publish package and access links.",
+      "order": 10,
+      "depends_on_stage_keys": ["final_review"],
+      "input_artifacts": [
+        {"artifact_type": "render_summary", "schema_key": "render_summary.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "publish_package", "schema_key": "publish_package.v1"}],
+      "tool_requirements": [{"capability": "storage", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Publish package contains render asset id and access URL metadata."],
+      "required_input_artifacts": ["render_summary", "review_notes"],
+      "output_artifact_types": ["publish_package"],
+      "required_capabilities": ["storage"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

@@ -1,0 +1,307 @@
+# One Deployment per queue (V8.1).
+#
+# Four small Deployments rather than one big one, because the queues have
+# genuinely different shapes: `provider` spends most of its time waiting on an
+# upstream API, `media` and `render` are CPU-bound in ffmpeg, `analysis` is short
+# and cheap. Running them together means a burst of paid renders starves
+# subtitle work, and a provider outage takes the whole worker fleet down with it.
+# Splitting them costs four small YAML blocks and buys independent scaling, which
+# is the thing `60-autoscaling.yaml` then acts on.
+#
+# Every worker also drains the outbox, reaps timed-out jobs and purges idempotency
+# keys — those duties are global and idempotent, so they stay on all roles rather
+# than being pinned to one lucky replica (see `worker_scaling` in the plan).
+#
+# The `migrate` Job owns schema changes; workers only ever read the schema. That
+# is why they carry no init container of their own.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s2v-worker-provider
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/queue: provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/queue: provider
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/queue: provider
+    spec:
+      # Paid provider submissions must not be cut off mid-flight at a fixed
+      # 30-second mark; the container is asked to finish first.
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "apps.worker.background_jobs"]
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          env:
+            - name: WORKER_ROLE
+              value: provider
+          ports:
+            - name: metrics
+              containerPort: 9100
+          volumeMounts:
+            - name: storage
+              mountPath: /app/storage
+            - name: tmp
+              mountPath: /tmp
+          # No HTTP server to probe: the worker's only health signal is that it is
+          # still claiming jobs. A liveness probe that restarts it on a busy queue
+          # is worse than none, so the readiness question is "did the process
+          # start", which the container runtime already answers.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: s2v-storage
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s2v-worker-analysis
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/queue: analysis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/queue: analysis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/queue: analysis
+    spec:
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "apps.worker.background_jobs"]
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          env:
+            - name: WORKER_ROLE
+              value: analysis
+          ports:
+            - name: metrics
+              containerPort: 9100
+          volumeMounts:
+            - name: storage
+              mountPath: /app/storage
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 3Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: s2v-storage
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s2v-worker-media
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/queue: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/queue: media
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/queue: media
+    spec:
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "apps.worker.background_jobs"]
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          env:
+            - name: WORKER_ROLE
+              value: media
+          ports:
+            - name: metrics
+              containerPort: 9100
+          volumeMounts:
+            - name: storage
+              mountPath: /app/storage
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            # ffmpeg is the CPU-bound step of this stack, so this is the limit
+            # worth tuning against the node rather than copying.
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: s2v-storage
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s2v-worker-render
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/queue: render
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s2v-studio
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/queue: render
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/queue: render
+    spec:
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "apps.worker.background_jobs"]
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          env:
+            - name: WORKER_ROLE
+              value: render
+          ports:
+            - name: metrics
+              containerPort: 9100
+          volumeMounts:
+            - name: storage
+              mountPath: /app/storage
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: s2v-storage
+        - name: tmp
+          emptyDir: {}

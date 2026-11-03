@@ -1,0 +1,271 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "localization_dub",
+  "display_name": "Localization Dub",
+  "description": "Take an existing video, transcribe and analyze it, then produce translated subtitles, dubbed narration, and an optional lip-sync pass before recomposition.",
+  "version": "0.1.0",
+  "category": "localization_dub",
+  "status": "beta",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": ["douyin", "xiaohongshu", "bilibili", "wechat_channels", "generic"],
+  "supported_aspect_ratios": ["16:9", "9:16", "1:1"],
+  "required_capabilities": ["media_analysis", "speech_to_text", "tts", "subtitle_generation", "video_composition", "storage"],
+  "optional_capabilities": ["llm_generation", "audio_processing"],
+  "artifact_contracts": {
+    "intake_brief": {"schema_key": "intake_brief.v1", "description": "Normalized source video reference, source and target languages, platform, and format."},
+    "media_analysis_report": {"schema_key": "media_analysis_report.v1", "description": "Source media analysis: transcript, scenes, audio energy, and stream inventory."},
+    "localization_plan": {"schema_key": "localization_plan.v1", "description": "Target languages, glossary, voice casting, and lip-sync policy for the dub."},
+    "spoken_script": {"schema_key": "spoken_script.v1", "description": "Timed translated narration segments and captions per target language."},
+    "dubbing_manifest": {"schema_key": "dubbing_manifest.v1", "description": "Generated dub audio tracks, subtitle tracks, alignment status, and lip-sync status."},
+    "edit_plan": {"schema_key": "edit_plan.v1", "description": "Subtitle style, audio mix, and recomposition intent."},
+    "render_summary": {"schema_key": "render_summary.v1", "description": "Render metadata and asset pointer for the localized video."},
+    "review_notes": {"schema_key": "review_notes.v1", "description": "Human review outcome and requested changes."},
+    "publish_package": {"schema_key": "publish_package.v1", "description": "Downloadable localized package and access links."}
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "V3.5",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/localization_dub.md",
+    "supported_use_cases": [
+      "video_translation",
+      "cross_border_marketing",
+      "course_localization",
+      "content_reposting"
+    ],
+    "localization_maturity": "planned_provider_contract",
+    "migration_policy": "This beta pipeline validates localization orchestration and contracts before real dub and lip-sync workers land in later versions."
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Localization Intake",
+      "description": "Normalize the source video reference, source language, target languages, platform, and aspect ratio.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "tool_requirements": [],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Brief preserves the source video reference.", "Source and target languages are normalized."],
+      "required_input_artifacts": [],
+      "output_artifact_types": ["intake_brief"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "analyze",
+      "display_name": "Source Analysis",
+      "description": "Analyze the source video: transcribe the original speech and inventory scenes and audio.",
+      "order": 2,
+      "depends_on_stage_keys": ["intake"],
+      "input_artifacts": [{"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"}],
+      "output_artifacts": [{"artifact_type": "media_analysis_report", "schema_key": "media_analysis_report.v1"}],
+      "tool_requirements": [
+        {"capability": "media_analysis", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "speech_to_text", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Transcript, scenes, and audio inventory exist or the missing-stream limitation is explicit."],
+      "required_input_artifacts": ["intake_brief"],
+      "output_artifact_types": ["media_analysis_report"],
+      "required_capabilities": ["media_analysis", "speech_to_text"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "localize_plan",
+      "display_name": "Localization Plan",
+      "description": "Decide target languages, translation glossary, voice casting, and the lip-sync policy.",
+      "order": 3,
+      "depends_on_stage_keys": ["analyze"],
+      "input_artifacts": [
+        {"artifact_type": "intake_brief", "schema_key": "intake_brief.v1"},
+        {"artifact_type": "media_analysis_report", "schema_key": "media_analysis_report.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "localization_plan", "schema_key": "localization_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": false, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["target languages", "glossary", "voice casting", "lip-sync policy"],
+        "success_criteria": ["Every target language has a glossary and a voice decision.", "Lip-sync expectations are explicit, including 'not requested'."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Plan lists target languages, glossary, voices, and lip-sync policy."],
+      "required_input_artifacts": ["intake_brief", "media_analysis_report"],
+      "output_artifact_types": ["localization_plan"],
+      "required_capabilities": [],
+      "optional_capabilities": ["llm_generation"],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "translate",
+      "display_name": "Localized Script",
+      "description": "Turn the transcript plus the approved plan into timed translated narration segments and captions.",
+      "order": 4,
+      "depends_on_stage_keys": ["localize_plan"],
+      "input_artifacts": [
+        {"artifact_type": "media_analysis_report", "schema_key": "media_analysis_report.v1"},
+        {"artifact_type": "localization_plan", "schema_key": "localization_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"}],
+      "tool_requirements": [
+        {"capability": "llm_generation", "required": true, "selector_policy": "configured_planner", "dispatch_policy": "agent_runner"}
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["translation accuracy", "glossary adherence", "timing fit", "caption readability"],
+        "success_criteria": ["Segments preserve original timing as closely as possible.", "Captions stay readable on the target platform."]
+      },
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Every transcript segment has a translated segment with text, caption, and timing."],
+      "required_input_artifacts": ["media_analysis_report", "localization_plan"],
+      "output_artifact_types": ["spoken_script"],
+      "required_capabilities": ["llm_generation"],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "dub",
+      "display_name": "Dub Generation",
+      "description": "Generate dubbed narration audio per target language and record alignment and lip-sync status.",
+      "order": 5,
+      "depends_on_stage_keys": ["translate"],
+      "input_artifacts": [
+        {"artifact_type": "spoken_script", "schema_key": "spoken_script.v1"},
+        {"artifact_type": "localization_plan", "schema_key": "localization_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "dubbing_manifest", "schema_key": "dubbing_manifest.v1"}],
+      "tool_requirements": [
+        {"capability": "tts", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Each target language has a dub track or an explicit provider blocker."],
+      "required_input_artifacts": ["spoken_script", "localization_plan"],
+      "output_artifact_types": ["dubbing_manifest"],
+      "required_capabilities": ["tts"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Localization Edit Plan",
+      "description": "Plan subtitle styling, audio mix between original and dub, and recomposition intent.",
+      "order": 6,
+      "depends_on_stage_keys": ["dub"],
+      "input_artifacts": [
+        {"artifact_type": "dubbing_manifest", "schema_key": "dubbing_manifest.v1"},
+        {"artifact_type": "localization_plan", "schema_key": "localization_plan.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"}],
+      "tool_requirements": [
+        {"capability": "subtitle_generation", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "agent_runner", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Edit plan records subtitle tracks, audio mix, and timeline intent."],
+      "required_input_artifacts": ["dubbing_manifest", "localization_plan"],
+      "output_artifact_types": ["edit_plan"],
+      "required_capabilities": ["subtitle_generation"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "compose",
+      "display_name": "Compose Localized Video",
+      "description": "Render the localized video with translated subtitles and dubbed audio.",
+      "order": 7,
+      "depends_on_stage_keys": ["edit"],
+      "input_artifacts": [
+        {"artifact_type": "edit_plan", "schema_key": "edit_plan.v1"},
+        {"artifact_type": "dubbing_manifest", "schema_key": "dubbing_manifest.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "tool_requirements": [
+        {"capability": "video_composition", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"},
+        {"capability": "audio_processing", "required": false, "selector_policy": "best_available", "dispatch_policy": "planned"}
+      ],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["A rendered localized video exists or the render blocker is explicit."],
+      "required_input_artifacts": ["edit_plan", "dubbing_manifest"],
+      "output_artifact_types": ["render_summary"],
+      "required_capabilities": ["video_composition"],
+      "optional_capabilities": ["audio_processing"],
+      "requires_human_review": false,
+      "timeout_seconds": 3600
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Final Localization Review",
+      "description": "Human review of the localized render before export.",
+      "order": 8,
+      "depends_on_stage_keys": ["compose"],
+      "input_artifacts": [{"artifact_type": "render_summary", "schema_key": "render_summary.v1"}],
+      "output_artifacts": [{"artifact_type": "review_notes", "schema_key": "review_notes.v1"}],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": ["translation accuracy", "dub timing", "subtitle fit", "audio mix"],
+        "success_criteria": ["Localized render is approved for export or concrete revisions are recorded."]
+      },
+      "dispatch_policy": {"mode": "human_gate", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage"},
+      "success_criteria": ["Review notes record approval or requested fixes."],
+      "required_input_artifacts": ["render_summary"],
+      "output_artifact_types": ["review_notes"],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "render_summary_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400
+    },
+    {
+      "stage_key": "export",
+      "display_name": "Export Localized Package",
+      "description": "Create the final localized package and access links.",
+      "order": 9,
+      "depends_on_stage_keys": ["final_review"],
+      "input_artifacts": [
+        {"artifact_type": "render_summary", "schema_key": "render_summary.v1"},
+        {"artifact_type": "review_notes", "schema_key": "review_notes.v1"}
+      ],
+      "output_artifacts": [{"artifact_type": "publish_package", "schema_key": "publish_package.v1"}],
+      "tool_requirements": [{"capability": "storage", "required": true, "selector_policy": "best_available", "dispatch_policy": "planned"}],
+      "review_policy": {"required": false, "gate_type": "none", "required_before_next_stage": false},
+      "dispatch_policy": {"mode": "stage_manifest", "auto_dispatch_required_tools": false, "idempotency_scope": "run_stage_tool"},
+      "success_criteria": ["Publish package contains render metadata and access link placeholders."],
+      "required_input_artifacts": ["render_summary", "review_notes"],
+      "output_artifact_types": ["publish_package"],
+      "required_capabilities": ["storage"],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

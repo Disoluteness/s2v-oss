@@ -1,0 +1,33 @@
+# Keep the build context to what the image actually needs. Without this the
+# whole working tree (including .venv and pytest caches) is uploaded to the
+# Docker daemon on every rebuild.
+#
+# Anything the Dockerfile COPYs must NOT be ignored here:
+#   apps/ packages/ pipelines/ tool_catalog/ infra/ scripts/
+#   pyproject.toml README.md alembic.ini
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.mypy_cache/
+.workbuddy/
+.DS_Store
+.git/
+.gitignore
+
+# Not needed at runtime: docs, tests and local artifacts.
+docs/
+tests/
+storage/
+*.db
+*.sqlite
+*.sqlite3
+
+.env
+
+# SDK build artifacts (the SDK ships as a package, not inside the API image)
+node_modules/

@@ -1,0 +1,82 @@
+# The migration step, as a Job (V8.5).
+#
+# This is the piece that makes a production upgrade a procedure rather than a
+# hope. In the development compose file migrations are an `exec` an operator is
+# expected to remember; here the schema change is an object in the cluster, so
+# "was it applied?" has an answer that is not a person's memory.
+#
+# The order in `docs/DEPLOYMENT.md` is:
+#
+#   1. take a backup and record it (`scripts/backup.sh --record`)
+#   2. turn maintenance mode on: POST /api/deployment/maintenance {"enabled": true}
+#   3. roll the images forward (`kubectl set image ...`)
+#   4. apply this Job and watch it finish
+#   5. roll the API and workers (they are gated on the Job where the cluster
+#      supports it — see the note on ordering below)
+#   6. verify: GET /api/deployment shows migration.current == migration.head
+#   7. turn maintenance mode off
+#
+# **The Job is not idempotent-by-regeneration.** `alembic upgrade head` is
+# idempotent (it applies whatever is pending and stops), so a re-run is safe —
+# which is why the recipe is `kubectl delete job` then `apply` rather than
+# `kubectl rollout restart`. Deleting the Job also deletes the evidence of the
+# previous run, so read its logs before you do.
+#
+# **Ordering between this Job and the Deployments is a judgement call, and the
+# honest answer is that the manifests cannot express it for you.** Kubernetes has
+# no "Deployment depends on a Job" primitive: an init container that waits on the
+# Job needs the Job's name, and a `PreSync` hook needs a tool like Argo CD. Roll
+# the Job first and let the Deployments follow — new code against a new schema is
+# the safe direction. The dangerous direction (new code against an old schema)
+# cannot happen this way, because the Job runs before anyone updates the image.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s2v-migrate
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/component: migrate
+spec:
+  # A schema change that failed should be looked at, not retried in a loop; and
+  # a failed Job object that keeps restarting pods hides which revision it died on.
+  backoffLimit: 1
+  # Deliberately not 0: with the default 600s the Job is garbage-collected ten
+  # minutes after it finishes, which removes the logs someone will want at exactly
+  # the moment they are debugging. One day is long enough to read them.
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s2v-studio
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: registry.example.com/s2v/studio:0.9.0 # CHANGE ME — same tag as api/worker
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: s2v-config
+            - secretRef:
+                name: s2v-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

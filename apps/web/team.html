@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio 团队与权限</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        height: 34px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0 12px;
+      }
+
+      button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      button.subtle {
+        background: var(--panel-soft);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+        outline: none;
+      }
+
+      input,
+      select {
+        height: 36px;
+        padding: 0 10px;
+      }
+
+      textarea {
+        padding: 8px 10px;
+        min-height: 64px;
+        resize: vertical;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        padding: 18px 16px;
+        overflow: auto;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 14px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1.2;
+      }
+
+      .brand span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+        font-size: 12px;
+      }
+
+      .identity-card {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        margin-bottom: 16px;
+      }
+
+      .identity-card label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .create-team {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        margin-bottom: 16px;
+      }
+
+      .create-team label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .team-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .team-button {
+        height: auto;
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: var(--panel-soft);
+        display: grid;
+        gap: 4px;
+      }
+
+      .team-button.active {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .team-button strong {
+        font-size: 13px;
+      }
+
+      .team-button small {
+        color: var(--muted);
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .title-block h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+
+      .title-block p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        min-width: 320px;
+      }
+
+      .toolbar select {
+        width: 220px;
+      }
+
+      .status-line {
+        padding: 10px 22px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel-soft);
+        font-size: 12px;
+      }
+
+      .status-line.warn {
+        color: var(--amber);
+      }
+
+      .status-line.error {
+        color: var(--red);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        padding: 18px 22px 32px;
+        align-items: start;
+      }
+
+      .main-column,
+      .side-column {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel);
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-header h3 {
+        margin: 0;
+        font-size: 14px;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+      }
+
+      .pill.warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .pill.ok {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .pill.muted {
+        background: var(--panel-soft);
+        color: var(--muted);
+      }
+
+      .pill.violet {
+        background: var(--purple-soft);
+        color: var(--purple);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .form-grid .full {
+        grid-column: 1 / -1;
+      }
+
+      .form-grid label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        background: var(--panel-soft);
+        white-space: nowrap;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .row-actions button {
+        height: 28px;
+        padding: 0 8px;
+        font-size: 12px;
+      }
+
+      .row-actions select {
+        height: 28px;
+        width: 110px;
+        font-size: 12px;
+      }
+
+      .empty {
+        padding: 24px 14px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 6px 10px;
+        font-size: 12px;
+      }
+
+      .kv dt {
+        color: var(--muted);
+      }
+
+      .kv dd {
+        margin: 0;
+        word-break: break-word;
+      }
+
+      .perm-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      .perm-list span {
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 4px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .matrix-row {
+        display: grid;
+        gap: 4px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .matrix-row:last-child {
+        border-bottom: 0;
+      }
+
+      .matrix-row strong {
+        font-size: 12px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 4px;
+      }
+
+      @media (max-width: 1180px) {
+        .shell,
+        .content {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Script2Video Studio</h1>
+          <span>团队与权限</span>
+        </div>
+
+        <div class="nav-links">
+          <a href="/dashboard">项目仪表盘</a>
+          <a href="/workspace">工作台</a>
+          <a href="/run-board">Run Board</a>
+          <a href="/asset-library">资产库</a>
+        </div>
+
+        <div class="identity-card" id="identityCard">
+          <label>当前身份</label>
+          <div><strong id="actorName">-</strong></div>
+          <div class="mono muted" id="actorId">-</div>
+          <div class="row-actions">
+            <span class="pill muted" id="actorSourceBadge">-</span>
+            <span class="pill" id="teamRoleBadge">-</span>
+          </div>
+          <div class="perm-list" id="actorPermissions"></div>
+        </div>
+
+        <form id="createTeamForm" class="create-team">
+          <label for="teamNameInput">新建团队</label>
+          <input id="teamNameInput" name="name" placeholder="团队名称" />
+          <input id="teamSlugInput" name="slug" placeholder="slug（可空，自动生成）" />
+          <button class="primary" type="submit">创建团队</button>
+        </form>
+
+        <div class="team-list" id="teamList"></div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div class="title-block">
+            <h2 id="teamTitle">团队与权限</h2>
+            <p id="teamMeta">
+              团队成员决定项目基线权限，项目成员在基线之上提权或降权；所有成员与角色变更都写入审计日志。
+            </p>
+          </div>
+          <div class="toolbar">
+            <button id="refreshButton" type="button">刷新</button>
+          </div>
+        </header>
+
+        <div id="statusLine" class="status-line">准备加载团队信息。</div>
+
+        <section class="content">
+          <div class="main-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>团队成员</h3>
+                <span class="pill" id="memberCountBadge">0 人</span>
+              </div>
+              <div class="panel-body">
+                <form id="addMemberForm" class="form-grid">
+                  <div>
+                    <label for="memberUserInput">用户 ID</label>
+                    <input id="memberUserInput" placeholder="user_xxxxxxxx" />
+                  </div>
+                  <div>
+                    <label for="memberNameInput">展示名（可空）</label>
+                    <input id="memberNameInput" placeholder="张三" />
+                  </div>
+                  <div>
+                    <label for="memberRoleInput">团队角色</label>
+                    <select id="memberRoleInput"></select>
+                  </div>
+                  <div>
+                    <button class="primary" type="submit">加入团队</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>成员</th>
+                      <th>角色</th>
+                      <th>状态</th>
+                      <th>生效权限</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="memberTableBody"></tbody>
+                </table>
+              </div>
+              <div id="memberEmpty" class="empty">该团队还没有成员。</div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>项目成员</h3>
+                <span class="pill violet" id="projectBadge">未选择项目</span>
+              </div>
+              <div class="panel-body">
+                <form id="addProjectMemberForm" class="form-grid">
+                  <div>
+                    <label for="projectMemberUserInput">用户 ID</label>
+                    <input id="projectMemberUserInput" placeholder="user_xxxxxxxx" />
+                  </div>
+                  <div>
+                    <label for="projectMemberRoleInput">项目角色</label>
+                    <select id="projectMemberRoleInput"></select>
+                  </div>
+                  <div>
+                    <label for="projectMemberNameInput">展示名（可空）</label>
+                    <input id="projectMemberNameInput" placeholder="李四" />
+                  </div>
+                  <div>
+                    <button class="primary" type="submit">加入项目</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>成员</th>
+                      <th>角色</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="projectMemberTableBody"></tbody>
+                </table>
+              </div>
+              <div id="projectMemberEmpty" class="empty">该项目还没有单独配置成员。</div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>审计日志</h3>
+                <span class="pill muted" id="auditCountBadge">0 条</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>操作</th>
+                      <th>对象</th>
+                      <th>操作人</th>
+                      <th>摘要</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditTableBody"></tbody>
+                </table>
+              </div>
+              <div id="auditEmpty" class="empty">暂无审计记录。</div>
+            </section>
+          </div>
+
+          <aside class="side-column">
+            <section class="panel">
+              <div class="panel-header">
+                <h3>权限矩阵</h3>
+                <span class="pill muted" id="matrixBadge">-</span>
+              </div>
+              <div class="panel-body">
+                <div class="kv" style="margin-bottom: 10px">
+                  <dt>团队角色</dt>
+                  <dd>owner / admin / member / viewer</dd>
+                  <dt>项目角色</dt>
+                  <dd>owner / editor / reviewer / viewer</dd>
+                </div>
+                <div id="matrixList"></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h3>访问方式</h3>
+                <span class="pill ok">V6.5</span>
+              </div>
+              <div class="panel-body">
+                <dl class="kv" id="accessList">
+                  <dt>默认身份</dt>
+                  <dd>未携带身份头的请求按默认身份处理，默认身份是默认团队的 owner。</dd>
+                  <dt>受信头</dt>
+                  <dd>X-Actor-Id / X-Actor-Name 由内部网关注入。</dd>
+                  <dt>校验模式</dt>
+                  <dd>ACTOR_TRUST_MODE=open 时直接信任；=secret 时需 X-Actor-Secret 匹配。</dd>
+                </dl>
+              </div>
+            </section>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const teamRoles = [
+        ["owner", "团队负责人"],
+        ["admin", "管理员"],
+        ["member", "成员"],
+        ["viewer", "只读"],
+      ];
+
+      const projectRoles = [
+        ["owner", "项目负责人"],
+        ["editor", "编辑"],
+        ["reviewer", "审核"],
+        ["viewer", "只读"],
+      ];
+
+      const actionLabels = {
+        "team.created": "创建团队",
+        "team.updated": "更新团队",
+        "team.member_added": "加入团队",
+        "team.member_updated": "更新团队成员",
+        "team.member_role_changed": "变更团队角色",
+        "team.member_removed": "移除团队成员",
+        "project.member_added": "加入项目",
+        "project.member_updated": "更新项目成员",
+        "project.member_role_changed": "变更项目角色",
+        "project.member_removed": "移除项目成员",
+        "permission.denied": "权限拒绝",
+      };
+
+      const state = {
+        actor: null,
+        matrix: null,
+        teams: [],
+        teamId: null,
+        members: [],
+        projects: [],
+        projectId: null,
+        projectMembers: [],
+        audit: [],
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      function optionList(select, entries, selected) {
+        select.innerHTML = entries
+          .map(([value, label]) => {
+            const isSelected = value === selected ? " selected" : "";
+            return `<option value="${escapeHtml(value)}"${isSelected}>${escapeHtml(label)}</option>`;
+          })
+          .join("");
+      }
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      }
+
+      function roleLabel(role) {
+        const entry =
+          teamRoles.find(([value]) => value === role) ||
+          projectRoles.find(([value]) => value === role);
+        return entry ? entry[1] : role || "-";
+      }
+
+      function statusLabel(status) {
+        return { active: "有效", removed: "已移除", archived: "已归档" }[status] || status || "-";
+      }
+
+      function setStatus(message, tone = "") {
+        const line = $("statusLine");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            if (body && typeof body.detail === "string") {
+              detail = body.detail;
+            } else if (body && body.detail) {
+              detail = body.detail.message || JSON.stringify(body.detail);
+            } else {
+              detail = JSON.stringify(body);
+            }
+          } catch (error) {
+            detail = response.statusText;
+          }
+          throw new Error(`${response.status} ${detail}`);
+        }
+        if (response.status === 204) {
+          return null;
+        }
+        return response.json();
+      }
+
+      function renderActor() {
+        const actor = state.actor;
+        if (!actor) {
+          return;
+        }
+        $("actorName").textContent = actor.display_name || actor.actor_id;
+        $("actorId").textContent = actor.actor_id;
+        $("actorSourceBadge").textContent =
+          actor.source === "default" ? "默认身份" : "受信头身份";
+        $("teamRoleBadge").textContent = actor.team_role
+          ? `团队角色：${roleLabel(actor.team_role)}`
+          : "未加入团队";
+        $("teamRoleBadge").className = actor.team_role ? "pill ok" : "pill warn";
+        const permissions = actor.permissions || [];
+        $("actorPermissions").innerHTML = permissions.length
+          ? permissions.map((item) => `<span>${escapeHtml(item)}</span>`).join("")
+          : '<span class="muted">当前没有任何权限</span>';
+      }
+
+      function renderTeams() {
+        const list = $("teamList");
+        if (!state.teams.length) {
+          list.innerHTML = '<div class="empty">还没有团队。</div>';
+          return;
+        }
+        list.innerHTML = state.teams
+          .map((team) => {
+            const active = team.team_id === state.teamId ? " active" : "";
+            const badge = team.is_default ? "默认团队" : `${team.member_count} 人`;
+            return [
+              `<button type="button" class="team-button${active}" data-team-id="${escapeHtml(team.team_id)}">`,
+              `<strong>${escapeHtml(team.name)}</strong>`,
+              `<small>${escapeHtml(team.slug)} · ${escapeHtml(badge)}</small>`,
+              "</button>",
+            ].join("");
+          })
+          .join("");
+        list.querySelectorAll("button[data-team-id]").forEach((button) => {
+          button.addEventListener("click", () => selectTeam(button.dataset.teamId));
+        });
+      }
+
+      function renderMembers() {
+        const body = $("memberTableBody");
+        $("memberEmpty").style.display = state.members.length ? "none" : "block";
+        body.innerHTML = state.members
+          .map((member) => {
+            const roleOptions = teamRoles
+              .map(
+                ([value, label]) =>
+                  `<option value="${value}"${value === member.role ? " selected" : ""}>${label}</option>`,
+              )
+              .join("");
+            const permissions = (member.permissions || [])
+              .map((item) => `<span>${escapeHtml(item)}</span>`)
+              .join("");
+            return [
+              "<tr>",
+              `<td><div>${escapeHtml(member.user_name || member.user_id)}</div>`,
+              `<div class="mono muted">${escapeHtml(member.user_id)}</div></td>`,
+              `<td><span class="pill">${escapeHtml(roleLabel(member.role))}</span></td>`,
+              `<td>${escapeHtml(statusLabel(member.status))}</td>`,
+              `<td><div class="perm-list">${permissions || '<span class="muted">-</span>'}</div></td>`,
+              "<td><div class=\"row-actions\">",
+              `<select data-member-role="${escapeHtml(member.membership_id)}">${roleOptions}</select>`,
+              `<button type="button" data-member-save="${escapeHtml(member.membership_id)}">保存</button>`,
+              `<button type="button" class="subtle" data-member-remove="${escapeHtml(member.membership_id)}">移除</button>`,
+              "</div></td>",
+              "</tr>",
+            ].join("");
+          })
+          .join("");
+        $("memberCountBadge").textContent = `${state.members.length} 人`;
+        body.querySelectorAll("button[data-member-save]").forEach((button) => {
+          button.addEventListener("click", () => saveMemberRole(button.dataset.memberSave));
+        });
+        body.querySelectorAll("button[data-member-remove]").forEach((button) => {
+          button.addEventListener("click", () => removeMember(button.dataset.memberRemove));
+        });
+      }
+
+      function renderProjects() {
+        if (!state.projects.length) {
+          $("projectBadge").textContent = "暂无项目";
+          return;
+        }
+        const current = state.projects.find((item) => item.project.project_id === state.projectId);
+        $("projectBadge").textContent = current ? current.project.title : "已选择项目";
+      }
+
+      function renderProjectMembers() {
+        const body = $("projectMemberTableBody");
+        $("projectMemberEmpty").style.display = state.projectMembers.length ? "none" : "block";
+        body.innerHTML = state.projectMembers
+          .map((member) => {
+            const roleOptions = projectRoles
+              .map(
+                ([value, label]) =>
+                  `<option value="${value}"${value === member.role ? " selected" : ""}>${label}</option>`,
+              )
+              .join("");
+            return [
+              "<tr>",
+              `<td><div>${escapeHtml(member.user_name || member.user_id)}</div>`,
+              `<div class="mono muted">${escapeHtml(member.user_id)}</div></td>`,
+              `<td><span class="pill violet">${escapeHtml(roleLabel(member.role))}</span></td>`,
+              `<td>${escapeHtml(statusLabel(member.status))}</td>`,
+              "<td><div class=\"row-actions\">",
+              `<select data-project-role="${escapeHtml(member.membership_id)}">${roleOptions}</select>`,
+              `<button type="button" data-project-save="${escapeHtml(member.membership_id)}">保存</button>`,
+              `<button type="button" class="subtle" data-project-remove="${escapeHtml(member.membership_id)}">移除</button>`,
+              "</div></td>",
+              "</tr>",
+            ].join("");
+          })
+          .join("");
+        body.querySelectorAll("button[data-project-save]").forEach((button) => {
+          button.addEventListener("click", () => saveProjectMemberRole(button.dataset.projectSave));
+        });
+        body.querySelectorAll("button[data-project-remove]").forEach((button) => {
+          button.addEventListener("click", () => removeProjectMember(button.dataset.projectRemove));
+        });
+      }
+
+      function renderAudit() {
+        const body = $("auditTableBody");
+        $("auditEmpty").style.display = state.audit.length ? "none" : "block";
+        $("auditCountBadge").textContent = `${state.audit.length} 条`;
+        body.innerHTML = state.audit
+          .map((entry) => {
+            const when = entry.created_at ? String(entry.created_at).replace("T", " ").slice(0, 19) : "-";
+            return [
+              "<tr>",
+              `<td class="mono">${escapeHtml(when)}</td>`,
+              `<td>${escapeHtml(actionLabels[entry.action] || entry.action)}</td>`,
+              `<td><div>${escapeHtml(entry.entity_type)}</div>`,
+              `<div class="mono muted">${escapeHtml(entry.entity_id || "-")}</div></td>`,
+              `<td class="mono">${escapeHtml(entry.actor_id || "-")}</td>`,
+              `<td>${escapeHtml(entry.summary || "-")}</td>`,
+              "</tr>",
+            ].join("");
+          })
+          .join("");
+      }
+
+      function renderMatrix() {
+        const matrix = state.matrix;
+        if (!matrix) {
+          return;
+        }
+        $("matrixBadge").textContent = `${matrix.permissions.length} 项权限`;
+        const rows = [
+          ...matrix.team_roles.map((entry) => ({ scope: "团队", ...entry })),
+          ...matrix.project_roles.map((entry) => ({ scope: "项目", ...entry })),
+        ];
+        $("matrixList").innerHTML = rows
+          .map((row) =>
+            [
+              '<div class="matrix-row">',
+              `<strong>${escapeHtml(row.scope)} · ${escapeHtml(roleLabel(row.role))}</strong>`,
+              `<div class="perm-list">${row.permissions
+                .map((item) => `<span>${escapeHtml(item)}</span>`)
+                .join("")}</div>`,
+              "</div>",
+            ].join(""),
+          )
+          .join("");
+      }
+
+      async function loadActor() {
+        state.actor = await api("/api/me");
+        renderActor();
+      }
+
+      async function loadMatrix() {
+        state.matrix = await api("/api/permissions");
+        renderMatrix();
+      }
+
+      async function loadTeams() {
+        state.teams = await api("/api/teams");
+        if (!state.teams.length) {
+          state.teamId = null;
+        } else if (!state.teams.some((team) => team.team_id === state.teamId)) {
+          const preferred = state.teams.find((team) => team.is_default) || state.teams[0];
+          state.teamId = preferred.team_id;
+        }
+        renderTeams();
+      }
+
+      async function loadMembers() {
+        if (!state.teamId) {
+          state.members = [];
+          renderMembers();
+          return;
+        }
+        state.members = await api(`/api/teams/${state.teamId}/members`);
+        renderMembers();
+      }
+
+      async function loadProjects() {
+        state.projects = await api("/api/projects");
+        if (!state.projects.length) {
+          state.projectId = null;
+        } else if (!state.projects.some((item) => item.project.project_id === state.projectId)) {
+          state.projectId = state.projects[0].project.project_id;
+        }
+        renderProjects();
+      }
+
+      async function loadProjectMembers() {
+        if (!state.projectId) {
+          state.projectMembers = [];
+          renderProjectMembers();
+          return;
+        }
+        state.projectMembers = await api(`/api/projects/${state.projectId}/members`);
+        renderProjectMembers();
+      }
+
+      async function loadAudit() {
+        state.audit = await api("/api/audit-logs?limit=100");
+        renderAudit();
+      }
+
+      async function selectTeam(teamId) {
+        state.teamId = teamId;
+        renderTeams();
+        try {
+          await loadMembers();
+          setStatus(`已切换到团队 ${teamId}。`);
+        } catch (error) {
+          setStatus(`加载团队成员失败：${error.message}`, "error");
+        }
+      }
+
+      async function createTeam(event) {
+        event.preventDefault();
+        const name = $("teamNameInput").value.trim();
+        const slug = $("teamSlugInput").value.trim();
+        if (!name) {
+          setStatus("请先填写团队名称。", "warn");
+          return;
+        }
+        const payload = { name };
+        if (slug) {
+          payload.slug = slug;
+        }
+        try {
+          const team = await api("/api/teams", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          $("teamNameInput").value = "";
+          $("teamSlugInput").value = "";
+          state.teamId = team.team_id;
+          await refresh();
+          setStatus(`已创建团队 ${team.name}。`);
+        } catch (error) {
+          setStatus(`创建团队失败：${error.message}`, "error");
+        }
+      }
+
+      async function addMember(event) {
+        event.preventDefault();
+        if (!state.teamId) {
+          setStatus("请先选择团队。", "warn");
+          return;
+        }
+        const userId = $("memberUserInput").value.trim();
+        if (!userId) {
+          setStatus("请填写用户 ID。", "warn");
+          return;
+        }
+        const payload = { user_id: userId, role: $("memberRoleInput").value };
+        const name = $("memberNameInput").value.trim();
+        if (name) {
+          payload.name = name;
+        }
+        try {
+          await api(`/api/teams/${state.teamId}/members`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          $("memberUserInput").value = "";
+          $("memberNameInput").value = "";
+          await loadMembers();
+          await loadAudit();
+          setStatus(`已把 ${userId} 加入团队。`);
+        } catch (error) {
+          setStatus(`加入团队失败：${error.message}`, "error");
+        }
+      }
+
+      async function saveMemberRole(membershipId) {
+        const select = document.querySelector(`select[data-member-role="${membershipId}"]`);
+        if (!select) {
+          return;
+        }
+        try {
+          await api(`/api/team-memberships/${membershipId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ role: select.value }),
+          });
+          await loadMembers();
+          await loadAudit();
+          setStatus("已更新团队角色。");
+        } catch (error) {
+          setStatus(`更新团队角色失败：${error.message}`, "error");
+        }
+      }
+
+      async function removeMember(membershipId) {
+        try {
+          await api(`/api/team-memberships/${membershipId}`, { method: "DELETE" });
+          await loadMembers();
+          await loadAudit();
+          setStatus("已移除团队成员。");
+        } catch (error) {
+          setStatus(`移除团队成员失败：${error.message}`, "error");
+        }
+      }
+
+      async function addProjectMember(event) {
+        event.preventDefault();
+        if (!state.projectId) {
+          setStatus("请先选择项目。", "warn");
+          return;
+        }
+        const userId = $("projectMemberUserInput").value.trim();
+        if (!userId) {
+          setStatus("请填写用户 ID。", "warn");
+          return;
+        }
+        const payload = { user_id: userId, role: $("projectMemberRoleInput").value };
+        const name = $("projectMemberNameInput").value.trim();
+        if (name) {
+          payload.name = name;
+        }
+        try {
+          await api(`/api/projects/${state.projectId}/members`, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          $("projectMemberUserInput").value = "";
+          $("projectMemberNameInput").value = "";
+          await loadProjectMembers();
+          await loadAudit();
+          setStatus(`已把 ${userId} 加入项目。`);
+        } catch (error) {
+          setStatus(`加入项目失败：${error.message}`, "error");
+        }
+      }
+
+      async function saveProjectMemberRole(membershipId) {
+        const select = document.querySelector(`select[data-project-role="${membershipId}"]`);
+        if (!select) {
+          return;
+        }
+        try {
+          await api(`/api/project-memberships/${membershipId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ role: select.value }),
+          });
+          await loadProjectMembers();
+          await loadAudit();
+          setStatus("已更新项目角色。");
+        } catch (error) {
+          setStatus(`更新项目角色失败：${error.message}`, "error");
+        }
+      }
+
+      async function removeProjectMember(membershipId) {
+        try {
+          await api(`/api/project-memberships/${membershipId}`, { method: "DELETE" });
+          await loadProjectMembers();
+          await loadAudit();
+          setStatus("已移除项目成员。");
+        } catch (error) {
+          setStatus(`移除项目成员失败：${error.message}`, "error");
+        }
+      }
+
+      async function refresh() {
+        try {
+          await loadActor();
+          await loadMatrix();
+          await loadTeams();
+          await loadMembers();
+          await loadProjects();
+          await loadProjectMembers();
+          await loadAudit();
+          setStatus("团队与权限已加载。");
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        }
+      }
+
+      function boot() {
+        optionList($("memberRoleInput"), teamRoles, "member");
+        optionList($("projectMemberRoleInput"), projectRoles, "editor");
+        $("createTeamForm").addEventListener("submit", createTeam);
+        $("addMemberForm").addEventListener("submit", addMember);
+        $("addProjectMemberForm").addEventListener("submit", addProjectMember);
+        $("refreshButton").addEventListener("click", refresh);
+        refresh();
+      }
+
+      boot();
+    </script>
+  </body>
+</html>

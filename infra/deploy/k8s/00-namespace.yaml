@@ -1,0 +1,17 @@
+# The namespace everything below lives in.
+#
+# There is no Helm chart here on purpose. A chart is a templating layer, and this
+# deployment has one shape and one set of knobs — the small number that genuinely
+# vary between hosts are already `${VAR}` placeholders in `docker-compose.prod.yml`
+# and are supplied here through a ConfigMap and a Secret. A chart would add a
+# release-name prefix, a values file and a rendered-manifest step to reason about,
+# in exchange for templating nothing currently needs. If a second shape ever
+# appears, promoting these manifests to a chart is a mechanical change; the
+# reverse is not.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+    app.kubernetes.io/part-of: s2v-studio

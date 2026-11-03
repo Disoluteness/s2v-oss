@@ -1,0 +1,45 @@
+# Ingress, for the two things that must be reachable from outside.
+#
+# Note what is *not* here: `/metrics` is not routed, and neither is anything that
+# only the cluster should talk to. `/metrics` is unauthenticated by design (V8.2 —
+# the consumer is a scraper, not an API caller), so the place to exclude it is the
+# edge, which is what this file is.
+#
+# The `/embed/` path matters more than it looks. Embeddable pages choose their
+# `frame-ancestors` from the integration that owns the path (V7.4), and that
+# header is only meaningful if the page is served over HTTPS on the same origin
+# the host platform was registered with. Terminating TLS anywhere else — or
+# serving the embed page from a different hostname than the integrations were
+# registered for — silently turns the embedding boundary into a suggestion.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: s2v-studio
+  namespace: s2v-studio
+  labels:
+    app.kubernetes.io/name: s2v-studio
+  annotations:
+    # Ingresses that upload assets or accept base64 bodies need to be told; the
+    # default 1m cap in most controllers is smaller than a real source clip, and
+    # the failure is a 413 from the proxy rather than from the application, which
+    # reads as "our upload limit is broken".
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+    # Provider callbacks and long avatar polls can outlive a 60-second default.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  ingressClassName: nginx # CHANGE ME to the cluster's controller
+  tls:
+    - hosts:
+        - studio.example.com # CHANGE ME — must match PUBLIC_BASE_URL in the ConfigMap
+      secretName: s2v-tls
+  rules:
+    - host: studio.example.com # CHANGE ME
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: s2v-api
+                port:
+                  name: http
