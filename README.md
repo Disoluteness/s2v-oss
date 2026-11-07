@@ -297,7 +297,7 @@ curl -X POST localhost:18080/api/deployment/maintenance \
 测试：
 
 ```bash
-pytest                 # 811 项
+pytest                 # 812 项
 make lint              # ruff
 ```
 
@@ -317,7 +317,7 @@ skills/           s2v-pipeline：给 Claude Code / Codex 等 AI 工具用的流�
 scripts/          backup.sh / restore.sh / deployment_preflight.py / verify_review_loop.py
 infra/            Dockerfile、生产 compose、K8s manifests
 docs/             架构决策、API 稳定性契约、部署 runbook、版本计划
-tests/            811 项 pytest
+tests/            812 项 pytest
 ```
 
 ## 文档索引

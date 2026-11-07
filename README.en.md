@@ -303,7 +303,7 @@ Backups are `scripts/backup.sh` (dump + manifest + sha256; `.env` is deliberatel
 Tests:
 
 ```bash
-pytest                 # 811 tests
+pytest                 # 812 tests
 make lint              # ruff
 ```
 
@@ -323,7 +323,7 @@ skills/           s2v-pipeline: a pipeline skill for AI tools like Claude Code /
 scripts/          backup.sh / restore.sh / deployment_preflight.py / verify_review_loop.py
 infra/            Dockerfiles, production compose, K8s manifests
 docs/             Architecture decisions, API stability contract, deployment runbook, version plans
-tests/            811 pytest tests
+tests/            812 pytest tests
 ```
 
 ## Documentation Index
