@@ -21,7 +21,7 @@ Script2Video Studio 是 clean-room 实现。OpenMontage 只能作为高层产品
 
 - FastAPI 服务、MySQL 持久化、Alembic、Docker Compose、后台 worker。
 - project / run / stage / artifact / asset / event / tool invocation / background job 基础模型，以及 V4 的 brand kit / style preset、V6.4 的 asset collection、V6.5 的 team / membership / audit log、V7.1 的 idempotency key、V7.2 的 api key、V7.3 的 webhook subscription / delivery、V7.4 的 external integration、V6.6 的 review attachment、V8.3 的 team quota、V8.4 的 encrypted secret、V8.5 的 deployment settings（34 张应用表；含 Alembic 自用的 `alembic_version` 为全库 35 张表）。
-- 多 pipeline：`avatar_spokesperson`、`animated_explainer`、`source_clip_factory`、`screen_demo`，并保留 `spokesperson_ad` 兼容 key。
+- 多 pipeline：`avatar_spokesperson`、`animated_explainer`、`source_clip_factory`、`screen_demo`、`hybrid_story`、`localization_dub`，素材剪辑三条 `talking_head` / `podcast_repurpose` / `cinematic`（见 `docs/CAPABILITY_GAP_PLAN.md` P1），并保留 `spokesperson_ad` 兼容 key。
 - 规则版与 DashScope LLM 规划器入口。
 - `production_plan`、`spoken_script`、`shot_list`、`preflight_report`、`execution_plan`、`stage_execution_manifest`、`asset_manifest`、`render_summary`、`publish_package`、`composition_graph`、`quality_report`、`review_*`、`proposal_packet` 等核心 artifact。
 - DashScope TTS、DashScope 图像、DashScope 数字人、ElevenLabs BGM、FFmpeg 合成与剪辑、本地预览素材生成。
@@ -68,7 +68,7 @@ Script2Video Studio 是 clean-room 实现。OpenMontage 只能作为高层产品
 
 | 能力域 | V1 启动时 | V1.0 状态 | 遗留（有意保留） |
 |---|---|---|---|
-| Pipeline 数量 | 1 条 | **5 条在册**（V1.0 时）：`avatar_spokesperson`（production）/ `animated_explainer` / `source_clip_factory` / `screen_demo`（beta）/ `spokesperson_ad`（draft 兼容键）；**V1.1 T94 补齐 `localization_dub` / `hybrid_story`（均 beta）后 7 条在册** | V3 点名的 6 条现已全部在册 |
+| Pipeline 数量 | 1 条 | **5 条在册**（V1.0 时）：`avatar_spokesperson`（production）/ `animated_explainer` / `source_clip_factory` / `screen_demo`（beta）/ `spokesperson_ad`（draft 兼容键）；**V1.1 T94 补齐 `localization_dub` / `hybrid_story`（均 beta）后 7 条在册**；**P1 补齐素材剪辑三条（`talking_head` / `podcast_repurpose` / `cinematic`，均 beta）后 10 条在册**（`docs/CAPABILITY_GAP_PLAN.md`） | V3 点名的 6 条现已全部在册；OpenMontage 13 条中剩余 6 条见 `CAPABILITY_GAP_PLAN.md` P6 / P8 |
 | Pipeline 定义 | JSON + loader | **DSL v1.0**（`dsl_version`）+ `pipeline_versions` 表 + run 绑定创建时版本 | `avatar_spokesperson.json` 缺 `dsl_version`，靠模型默认值兜住（见 `RELEASE_CHECKLIST.md` §5） |
 | 阶段指导 | 规则规划器 | `docs/pipeline-strategies/` 4 篇 + `stage_executor` | 策略是**代码**而非运行时可配置的策略文档引擎 |
 | Tool Registry | 基础 registry + preflight | selector / fallback scoring / cost model / quality profile（`tool_kit`） | — |

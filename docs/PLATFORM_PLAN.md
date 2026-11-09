@@ -98,8 +98,8 @@ Web 工作台（/workspace、/dashboard、/run-board）
 
 ## 4. 数据模型
 
-当前共 **35 张应用表**（22 个 Alembic migration，head = `20261012_0022`；Alembic 自用的 `alembic_version`
-记账表不计入，仓库里说「全库 36 张表」时指的是含它的口径——迁移往返验证打印的正是后者）：
+当前共 **36 张应用表**（23 个 Alembic migration，head = `20261109_0023`；Alembic 自用的 `alembic_version`
+记账表不计入，仓库里说「全库 37 张表」时指的是含它的口径——迁移往返验证打印的正是后者）：
 
 | 表 | 作用 |
 |---|---|
@@ -394,7 +394,7 @@ V8.4 的 `provider:manage` 还有一处刻意的不对称：**没有 `provider:r
 执行层是**一张策略表 + 一个应用级依赖**：`apps/api/app/permission_policy.py` 的 `POLICY`（132 条）由
 `main.py` 以 `include_router(..., dependencies=[Depends(enforce_api_permissions)])` 挂载，因此新增端点
 无法通过忘记声明依赖来绕过；未受控端点必须显式登记进同文件的 `OPEN_ENDPOINTS`（16 条，逐条写明理由），
-并有测试断言两表**精确划分**全部文档化端点（当前 124 path / 156 operation；见 §12.3），杜绝新端点静默逃逸。`/metrics`（V8.2 Prometheus 抓取端点）刻意不在其中——它是 app 级路由、`include_in_schema=False`，消费者是抓取器而非 API 调用方。
+并有测试断言两表**精确划分**全部文档化端点（当前 125 path / 157 operation；见 §12.3），杜绝新端点静默逃逸。`/metrics`（V8.2 Prometheus 抓取端点）刻意不在其中——它是 app 级路由、`include_in_schema=False`，消费者是抓取器而非 API 调用方。
 V7.2 的三个凭证端点（`GET` / `POST /api/api-keys`、`POST /api/api-keys/{api_key_id}/revoke`）落在
 `POLICY` 里，要求租户级的 `apikey:manage`；V7.4 的六个集成端点（含签发嵌入会话）落在 `POLICY` 里，
 要求租户级的 `integration:manage`，只有开放的自举端点 `GET /api/embed/{integration_id}/session`
@@ -654,7 +654,7 @@ docker compose exec -T api python scripts/verify_review_loop.py
 带修改通过生成待办、重跑触发下游失效与请求作废、board / 收件箱字段、错误码映射、质量意图降级、
 成本预留与首次付费确认、资产库沉淀与复用、团队与权限（身份解析、角色矩阵、越权 403、审计流水）、
 API v1 契约（错误信封、错误码目录、幂等重放/冲突、分页）、API key（一次性明文、Bearer 身份、
-scope 收窄与越界理由、吊销幂等）、webhook（事件目录、订阅校验、outbox 快照、手动重投、自动停用阈值与人工重激活清零）、可嵌入工作台（集成注册与契约回显、`*` origin 400 与同名 slug 409、mint 的四种失败、令牌自举、钉定 run 可读而兄弟 run 与租户级端点 403 `embed_context`、越权写 403 `embed_scope`、页面 CSP 与 `no-store`、停用后旧链接失效并可恢复）、审核附件（挂载幂等、快照回显、跨项目 404、移除与事件）、worker scaling（provider 队列归属、优先级与租约/退避字段回显、手动重试消耗 attempt、非死信重放 409、未知 job 404）、observability（/metrics 免鉴权可抓且不进 OpenAPI、请求标识生成与回显、面板四视图、未入座 403）、配额与计费（未配置静默、hard 越界 400 与 soft 放行、一次性豁免、归属端点 `quota:manage`、`ProjectCreate` 不收 `team_id`）、安全加固（`provider-credentials*` 已受控、`provider:manage` 租户级且无 read 孪生、`rotate` 迁移与重加密、回调签名两分支、上传 413/415、资产链接 TTL 夹取与生产默认密钥 503）、部署姿态（姿态形状与版本、迁移自检、能力只报布尔、未入座读 403 而 member 读 200 写 403、维护中拒写 503 且读与探针仍答、维护中逃生舱可写、关闭后写立即恢复、备份记账与审计只按跃迁落条）、发布契约冻结（`app_version` 与 `info.version` 一致、迁移到 head、pipeline 目录 ≥4 且字段齐全、错误码目录 26 条、webhook 事件目录 6 条、provider 能力主备自适应、权限矩阵 23 键 / 租户级 7 个）、七个 Web 页面标记。共 **390 项检查**（默认配置；同时配置 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` 时为 **394 项**）。失败会打印期望值与实际值
+scope 收窄与越界理由、吊销幂等）、webhook（事件目录、订阅校验、outbox 快照、手动重投、自动停用阈值与人工重激活清零）、可嵌入工作台（集成注册与契约回显、`*` origin 400 与同名 slug 409、mint 的四种失败、令牌自举、钉定 run 可读而兄弟 run 与租户级端点 403 `embed_context`、越权写 403 `embed_scope`、页面 CSP 与 `no-store`、停用后旧链接失效并可恢复）、审核附件（挂载幂等、快照回显、跨项目 404、移除与事件）、worker scaling（provider 队列归属、优先级与租约/退避字段回显、手动重试消耗 attempt、非死信重放 409、未知 job 404）、observability（/metrics 免鉴权可抓且不进 OpenAPI、请求标识生成与回显、面板四视图、未入座 403）、配额与计费（未配置静默、hard 越界 400 与 soft 放行、一次性豁免、归属端点 `quota:manage`、`ProjectCreate` 不收 `team_id`）、安全加固（`provider-credentials*` 已受控、`provider:manage` 租户级且无 read 孪生、`rotate` 迁移与重加密、回调签名两分支、上传 413/415、资产链接 TTL 夹取与生产默认密钥 503）、部署姿态（姿态形状与版本、迁移自检、能力只报布尔、未入座读 403 而 member 读 200 写 403、维护中拒写 503 且读与探针仍答、维护中逃生舱可写、关闭后写立即恢复、备份记账与审计只按跃迁落条）、发布契约冻结（`app_version` 与 `info.version` 一致、迁移到 head、pipeline 目录 ≥4 且字段齐全、错误码目录 28 条、webhook 事件目录 6 条、provider 能力主备自适应、权限矩阵 23 键 / 租户级 7 个）、七个 Web 页面标记。共 **408 项检查**（默认配置；同时配置 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` 时为 **412 项**）。失败会打印期望值与实际值
 并以非 0 退出，可作为每个版本的部署门禁。
 
 注意：门禁**可对同一个库重复运行**——第 14 节的固定 slug 团队（`verify-team`）在已存在时按
@@ -734,11 +734,11 @@ V1.1 的 T96 新增登录会话：`users` 加 `password_hash` / `password_update
 其他检查：
 
 - `ruff` 通过。
-- 22 个 migration 可 upgrade 到 head（head = `20261012_0022`，全库 36 张表）；`20261009_0011` / `20261009_0012` / `20261010_0013` / `20261010_0014` / `20261010_0015` / `20261010_0016` / `20261010_0017` / `20261010_0018` / `20261012_0019` / `20261012_0020` / `20261012_0021` / `20261012_0022` 都做了 upgrade/downgrade 往返验证。
+- 23 个 migration 可 upgrade 到 head（head = `20261109_0023`，全库 37 张表）；`20261009_0011` / `20261009_0012` / `20261010_0013` / `20261010_0014` / `20261010_0015` / `20261010_0016` / `20261010_0017` / `20261010_0018` / `20261012_0019` / `20261012_0020` / `20261012_0021` / `20261012_0022` / `20261109_0023` 都做了 upgrade/downgrade 往返验证。
 - OpenAPI 共 124 个 path / 156 个 operation；7 个 HTML 页面（含 V7.4 的两个嵌入壳）不计入 schema。
 - Python SDK 零运行时依赖（`sdk/python`，`import s2v`）；TypeScript SDK 编译产物 5 个 `dist/*.js` 全部通过 `node --check`（`sdk/typescript`，npm `s2v-client`）。
 - 7 个页面的内联脚本通过 `node --check`。
-- 部署后门禁：`docker compose exec -T api python scripts/verify_review_loop.py`（**390 项检查** = 第 1–10 节 82（审核体系 / 错误码 / 五个页面标记）+ 11 质量意图 + 12 预算与付费确认 + 22 资产库 + 32 团队与权限 + 23 API 契约 + 25 API key 与 SDK 契约 + 24 webhook + 54 可嵌入工作台 + 17 审核附件 + 10 worker scaling（队列归属 / 优先级 / 手动重试 / 死信重放 409 与 404）+ 13 observability（/metrics、请求标识、面板、权限）+ 22 配额与计费（周期窗口 / 硬软闸门 / 一次性豁免 / 归属与 404）+ 14/18 安全加固（端点接管 / 权限矩阵 / rotate / 回调签名 / 上传 / 链接）+ 16 部署姿态（迁移自检 / 维护模式拒写放读 / 逃生舱 / 备份记账 / 审计只按跃迁）+ 13 发布契约冻结（版本三处一致 / 迁移到 head / pipeline 目录 / 错误码目录 / webhook 事件 / provider 主备 / 权限矩阵；同时配置 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` 时为 **394 项**），只走 HTTP）。
+- 部署后门禁：`docker compose exec -T api python scripts/verify_review_loop.py`（**390 项检查** = 第 1–10 节 82（审核体系 / 错误码 / 五个页面标记）+ 11 质量意图 + 12 预算与付费确认 + 22 资产库 + 32 团队与权限 + 23 API 契约 + 25 API key 与 SDK 契约 + 24 webhook + 54 可嵌入工作台 + 17 审核附件 + 10 worker scaling（队列归属 / 优先级 / 手动重试 / 死信重放 409 与 404）+ 13 observability（/metrics、请求标识、面板、权限）+ 22 配额与计费（周期窗口 / 硬软闸门 / 一次性豁免 / 归属与 404）+ 14/18 安全加固（端点接管 / 权限矩阵 / rotate / 回调签名 / 上传 / 链接）+ 16 部署姿态（迁移自检 / 维护模式拒写放读 / 逃生舱 / 备份记账 / 审计只按跃迁）+ 13 发布契约冻结（版本三处一致 / 迁移到 head / pipeline 目录 / 错误码目录 / webhook 事件 / provider 主备 / 权限矩阵）+ 18 决策审计日志（取舍与备选 / 置信度依据 / 跳过项也有账 / 人工裁决身份 / 分类过滤 / 截断标记 / 只读；同时配置 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` 时为 **412 项**），只走 HTTP）。
 - 部署制品（V8.5）：`docker-compose.prod.yml`、`infra/deploy/k8s/`（7 个清单，明确不做 Helm）、`scripts/backup.sh` / `restore.sh` / `deployment_preflight.py`，步骤见 `docs/DEPLOYMENT.md`。
 - 发布收口制品（V1.0）：`CHANGELOG.md`、`docs/API_STABILITY.md`（含 `docs/DECISIONS.md` 的 ADR-006）、`docs/RELEASE_CHECKLIST.md`、`examples/`（curl / Python SDK / TypeScript SDK 三条路径）、`tests/test_release.py`（16 项）。`APP_VERSION = "1.1.0"`（V1.1 T98 抬号；`1.0.0` 起兼容性承诺生效，`1.1.0` 为首个增量次版本，稳定面形状未动）。
 - 每个版本任务的验收方式记录在 `docs/TASK_BOARD.md`。

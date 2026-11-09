@@ -146,7 +146,7 @@ def test_an_ordinary_write_is_refused() -> None:
 
 
 def test_the_head_is_the_newest_migration_on_disk() -> None:
-    assert alembic_head() == "20261012_0022"
+    assert alembic_head() == "20261109_0023"
 
 
 def test_an_unknown_revision_reports_nothing_pending() -> None:
@@ -155,16 +155,16 @@ def test_an_unknown_revision_reports_nothing_pending() -> None:
 
 
 def test_being_at_the_head_reports_nothing_pending() -> None:
-    assert alembic_pending("20261012_0022") == []
+    assert alembic_pending("20261109_0023") == []
 
 
 def test_pending_is_the_gap_in_application_order() -> None:
-    assert alembic_pending("20261012_0020") == ["20261012_0021", "20261012_0022"]
+    assert alembic_pending("20261012_0021") == ["20261012_0022", "20261109_0023"]
 
 
 def test_a_revision_behind_reports_the_whole_chain_in_order() -> None:
     pending = alembic_pending("20260915_0001")
-    assert pending[-1] == "20261012_0022"
+    assert pending[-1] == "20261109_0023"
     assert pending[0] == "20260916_0002"
     # Ascending, which is the order they must run in — a reversed list would be a
     # plausible-looking answer that is simply wrong.
@@ -175,7 +175,7 @@ def test_a_revision_that_is_not_on_the_head_ancestry_reports_the_full_chain() ->
     """A divergent revision is not "nearly up to date"; it is "unknown"."""
     pending = alembic_pending("29990101_9999")
     assert pending
-    assert pending[-1] == "20261012_0022"
+    assert pending[-1] == "20261109_0023"
 
 
 def test_capabilities_describe_behaviour_not_environment_variables() -> None:
@@ -334,7 +334,7 @@ def test_table_count_is_readable_and_plausible(asgi) -> None:
 def test_the_overview_reports_cannot_tell_rather_than_claiming_health(asgi) -> None:
     overview = asgi.store.deployment_overview()
     assert overview.app_version == APP_VERSION
-    assert overview.migration.head == "20261012_0022"
+    assert overview.migration.head == "20261109_0023"
     assert overview.migration.current is None
     # The important assertion: an unknown revision is *not* vacuously "up to date".
     assert overview.migration.up_to_date is False

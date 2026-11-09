@@ -1,0 +1,594 @@
+{
+  "dsl_version": "1.0",
+  "pipeline_key": "cinematic",
+  "display_name": "Cinematic",
+  "description": "Cut a mood-led piece from existing footage: build an emotional arc, drive it with music, grade it, and hold the result to a motion promise instead of a narrative one.",
+  "version": "0.1.0",
+  "category": "cinematic",
+  "status": "beta",
+  "default_language": "zh-CN",
+  "entrypoint_stage_key": "intake",
+  "supported_platforms": [
+    "douyin",
+    "xiaohongshu",
+    "bilibili",
+    "wechat_channels",
+    "youtube",
+    "generic"
+  ],
+  "supported_aspect_ratios": [
+    "16:9",
+    "9:16",
+    "1:1"
+  ],
+  "required_capabilities": [
+    "asset_ingestion",
+    "media_analysis",
+    "clip_selection",
+    "clip_export",
+    "storage"
+  ],
+  "optional_capabilities": [
+    "music_generation",
+    "video_composition",
+    "subtitle_generation",
+    "color_grading",
+    "audio_processing"
+  ],
+  "artifact_contracts": {
+    "intake_brief": {
+      "schema_key": "intake_brief.v1",
+      "description": "Normalized mood brief: emotional register, references, pacing, duration, and platform."
+    },
+    "source_media_review": {
+      "schema_key": "source_media_review.v1",
+      "description": "Uploaded footage, mood references, music rights, and usage notes."
+    },
+    "media_analysis_report": {
+      "schema_key": "media_analysis_report.v1",
+      "description": "Source metadata, scenes, transcript, and analysis notes."
+    },
+    "clip_candidate_list": {
+      "schema_key": "clip_candidate_list.v1",
+      "description": "Candidate shots ranked by emotional fit and rhythm rather than narrative completeness."
+    },
+    "edit_plan": {
+      "schema_key": "edit_plan.v1",
+      "description": "Approved clip timeline, reframing, captions, audio, and export instructions."
+    },
+    "clip_export_manifest": {
+      "schema_key": "clip_export_manifest.v1",
+      "description": "Exported clip assets and per-clip render metadata."
+    },
+    "review_notes": {
+      "schema_key": "review_notes.v1",
+      "description": "Human review outcome and requested changes."
+    },
+    "publish_package": {
+      "schema_key": "publish_package.v1",
+      "description": "Downloadable clip package and access metadata."
+    }
+  },
+  "metadata": {
+    "clean_room": true,
+    "roadmap_version": "P1",
+    "product_surface": "script_to_video_service",
+    "strategy_document": "docs/pipeline-strategies/cinematic.md",
+    "supported_use_cases": [
+      "brand_trailer",
+      "mood_film",
+      "product_teaser",
+      "event_promo"
+    ],
+    "mood_led": true,
+    "migration_policy": "Beta line. Selection is mood-led; grading depends on P5 tools and degrades explicitly when absent."
+  },
+  "stages": [
+    {
+      "stage_key": "intake",
+      "display_name": "Mood Intake",
+      "description": "Normalize the emotional register (calm, tense, uplift), target duration, pacing, reference pieces, and whether music comes from the user or must be generated.",
+      "order": 1,
+      "depends_on_stage_keys": [],
+      "input_artifacts": [],
+      "output_artifacts": [
+        {
+          "artifact_type": "intake_brief",
+          "schema_key": "intake_brief.v1"
+        }
+      ],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": false,
+        "gate_type": "none",
+        "required_before_next_stage": false
+      },
+      "dispatch_policy": {
+        "mode": "agent_runner",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Brief states the emotional register, pacing, duration, and music source."
+      ],
+      "required_input_artifacts": [],
+      "output_artifact_types": [
+        "intake_brief"
+      ],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 120
+    },
+    {
+      "stage_key": "source_ingest",
+      "display_name": "Footage and Music Review",
+      "description": "Register source footage and music, confirm rights for both, and note whether the piece is carried by the shots or by the soundtrack.",
+      "order": 2,
+      "depends_on_stage_keys": [
+        "intake"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "intake_brief",
+          "schema_key": "intake_brief.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "source_media_review",
+          "schema_key": "source_media_review.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "asset_ingestion",
+          "required": true,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": [
+          "source media present",
+          "usage rights",
+          "target clip count",
+          "clip duration",
+          "platform fit"
+        ],
+        "success_criteria": [
+          "Sources are registered or the missing source blocker is explicit."
+        ]
+      },
+      "dispatch_policy": {
+        "mode": "agent_runner",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Footage and music are registered, or the missing asset is explicit."
+      ],
+      "required_input_artifacts": [
+        "intake_brief"
+      ],
+      "output_artifact_types": [
+        "source_media_review"
+      ],
+      "required_capabilities": [
+        "asset_ingestion"
+      ],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 300,
+      "review_focus": [
+        "footage present and lit",
+        "music rights",
+        "shot variety",
+        "mood references",
+        "target duration"
+      ]
+    },
+    {
+      "stage_key": "analysis",
+      "display_name": "Rhythm and Mood Analysis",
+      "description": "Probe metadata, detect shot boundaries and average shot length, sample frames, and extract an audio energy timeline used as the beat map.",
+      "order": 3,
+      "depends_on_stage_keys": [
+        "source_ingest"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "source_media_review",
+          "schema_key": "source_media_review.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "media_analysis_report",
+          "schema_key": "media_analysis_report.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "media_analysis",
+          "required": true,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        },
+        {
+          "capability": "audio_processing",
+          "required": false,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": false,
+        "gate_type": "none",
+        "required_before_next_stage": false
+      },
+      "dispatch_policy": {
+        "mode": "agent_runner",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Analysis records shot lengths, motion notes, and an energy timeline."
+      ],
+      "required_input_artifacts": [
+        "source_media_review"
+      ],
+      "output_artifact_types": [
+        "media_analysis_report"
+      ],
+      "required_capabilities": [
+        "media_analysis"
+      ],
+      "optional_capabilities": [
+        "audio_processing"
+      ],
+      "requires_human_review": false,
+      "timeout_seconds": 900
+    },
+    {
+      "stage_key": "clip_selection",
+      "display_name": "Shot Selection",
+      "description": "Rank shots by emotional fit, visual strength, and how they sit against the beat map. Narrative completeness is explicitly not the criterion here.",
+      "order": 4,
+      "depends_on_stage_keys": [
+        "analysis"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "source_media_review",
+          "schema_key": "source_media_review.v1"
+        },
+        {
+          "artifact_type": "media_analysis_report",
+          "schema_key": "media_analysis_report.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "clip_candidate_list",
+          "schema_key": "clip_candidate_list.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "clip_selection",
+          "required": true,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": [
+          "candidate relevance",
+          "hook strength",
+          "rights and sensitivity",
+          "target duration",
+          "platform fit"
+        ],
+        "success_criteria": [
+          "Reviewer can approve, reject, or request new candidates."
+        ]
+      },
+      "dispatch_policy": {
+        "mode": "agent_runner",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Shortlist records shot windows, mood scores, and the intended position in the arc."
+      ],
+      "required_input_artifacts": [
+        "source_media_review",
+        "media_analysis_report"
+      ],
+      "output_artifact_types": [
+        "clip_candidate_list"
+      ],
+      "required_capabilities": [
+        "clip_selection"
+      ],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "timeout_seconds": 600,
+      "review_focus": [
+        "emotional fit",
+        "visual strength",
+        "beat alignment",
+        "shot variety",
+        "arc across the piece"
+      ]
+    },
+    {
+      "stage_key": "edit",
+      "display_name": "Arc, Grade, Transitions",
+      "description": "Lay out the emotional arc, place music, choose transitions, and specify a grade. When no grading tool is available the plan records a flat grade rather than claiming one.",
+      "order": 5,
+      "depends_on_stage_keys": [
+        "clip_selection"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "clip_candidate_list",
+          "schema_key": "clip_candidate_list.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "edit_plan",
+          "schema_key": "edit_plan.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "music_generation",
+          "required": false,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        },
+        {
+          "capability": "color_grading",
+          "required": false,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        },
+        {
+          "capability": "video_composition",
+          "required": false,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        },
+        {
+          "capability": "subtitle_generation",
+          "required": false,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": false,
+        "gate_type": "none",
+        "required_before_next_stage": false
+      },
+      "dispatch_policy": {
+        "mode": "agent_runner",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Edit plan records the arc, music cue points, transitions, and grade intent."
+      ],
+      "required_input_artifacts": [
+        "clip_candidate_list"
+      ],
+      "output_artifact_types": [
+        "edit_plan"
+      ],
+      "required_capabilities": [],
+      "optional_capabilities": [
+        "music_generation",
+        "color_grading",
+        "video_composition",
+        "subtitle_generation"
+      ],
+      "requires_human_review": false,
+      "timeout_seconds": 300
+    },
+    {
+      "stage_key": "export_clips",
+      "display_name": "Export Cinematic Cut",
+      "description": "Export the graded cut. Export is planned and not auto-dispatched.",
+      "order": 6,
+      "depends_on_stage_keys": [
+        "edit"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "clip_candidate_list",
+          "schema_key": "clip_candidate_list.v1"
+        },
+        {
+          "artifact_type": "edit_plan",
+          "schema_key": "edit_plan.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "clip_export_manifest",
+          "schema_key": "clip_export_manifest.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "clip_export",
+          "required": true,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": false,
+        "gate_type": "none",
+        "required_before_next_stage": false
+      },
+      "dispatch_policy": {
+        "mode": "stage_manifest",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage_tool"
+      },
+      "success_criteria": [
+        "Clip export manifest exists or the export blocker is explicit."
+      ],
+      "required_input_artifacts": [
+        "clip_candidate_list",
+        "edit_plan"
+      ],
+      "output_artifact_types": [
+        "clip_export_manifest"
+      ],
+      "required_capabilities": [
+        "clip_export"
+      ],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 1800
+    },
+    {
+      "stage_key": "final_review",
+      "display_name": "Cinematic Review",
+      "description": "Review motion, pacing, and grade against the promise made at intake — a piece that claimed to be motion-led must not be a slideshow with music.",
+      "order": 7,
+      "depends_on_stage_keys": [
+        "export_clips"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "clip_export_manifest",
+          "schema_key": "clip_export_manifest.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "review_notes",
+          "schema_key": "review_notes.v1"
+        }
+      ],
+      "tool_requirements": [],
+      "review_policy": {
+        "required": true,
+        "gate_type": "human_review",
+        "required_before_next_stage": true,
+        "review_focus": [
+          "clip quality",
+          "cut points",
+          "captions",
+          "rights",
+          "platform fit"
+        ],
+        "success_criteria": [
+          "Final clips are approved for packaging or concrete fixes are recorded."
+        ]
+      },
+      "dispatch_policy": {
+        "mode": "human_gate",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage"
+      },
+      "success_criteria": [
+        "Review notes record approval or requested fixes."
+      ],
+      "required_input_artifacts": [
+        "clip_export_manifest"
+      ],
+      "output_artifact_types": [
+        "review_notes"
+      ],
+      "required_capabilities": [],
+      "optional_capabilities": [],
+      "requires_human_review": true,
+      "skippable": true,
+      "skip_policy": {
+        "allowed_when": "clip_export_manifest_exists",
+        "reason_required": true,
+        "creates_artifact": "review_notes"
+      },
+      "timeout_seconds": 86400,
+      "review_focus": [
+        "motion holds up",
+        "pacing against the beat",
+        "grade consistency",
+        "arc lands",
+        "platform fit"
+      ]
+    },
+    {
+      "stage_key": "publish",
+      "display_name": "Package Cinematic Cut",
+      "description": "Create the package with grade notes, music attribution, and export metadata.",
+      "order": 8,
+      "depends_on_stage_keys": [
+        "final_review"
+      ],
+      "input_artifacts": [
+        {
+          "artifact_type": "clip_export_manifest",
+          "schema_key": "clip_export_manifest.v1"
+        },
+        {
+          "artifact_type": "review_notes",
+          "schema_key": "review_notes.v1"
+        }
+      ],
+      "output_artifacts": [
+        {
+          "artifact_type": "publish_package",
+          "schema_key": "publish_package.v1"
+        }
+      ],
+      "tool_requirements": [
+        {
+          "capability": "storage",
+          "required": true,
+          "selector_policy": "best_available",
+          "dispatch_policy": "planned"
+        }
+      ],
+      "review_policy": {
+        "required": false,
+        "gate_type": "none",
+        "required_before_next_stage": false
+      },
+      "dispatch_policy": {
+        "mode": "stage_manifest",
+        "auto_dispatch_required_tools": false,
+        "idempotency_scope": "run_stage_tool"
+      },
+      "success_criteria": [
+        "Publish package contains clip export metadata and access link placeholders."
+      ],
+      "required_input_artifacts": [
+        "clip_export_manifest",
+        "review_notes"
+      ],
+      "output_artifact_types": [
+        "publish_package"
+      ],
+      "required_capabilities": [
+        "storage"
+      ],
+      "optional_capabilities": [],
+      "requires_human_review": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

@@ -80,6 +80,10 @@ def team_html_path() -> Path:
     return Path(__file__).resolve().parents[3] / "apps" / "web" / "team.html"
 
 
+def settings_html_path() -> Path:
+    return Path(__file__).resolve().parents[3] / "apps" / "web" / "settings.html"
+
+
 def embed_html_path() -> Path:
     return Path(__file__).resolve().parents[3] / "apps" / "web" / "embed.html"
 
@@ -123,6 +127,13 @@ def create_app() -> FastAPI:
     @app.get("/team", response_class=FileResponse, include_in_schema=False)
     def team() -> FileResponse:
         return FileResponse(team_html_path())
+
+    # Operator settings live on their own page rather than inside the dashboard:
+    # provider secrets are a tenant-level concern that does not depend on which
+    # project is selected, and the dashboard is already project-scoped.
+    @app.get("/settings", response_class=FileResponse, include_in_schema=False)
+    def settings_page() -> FileResponse:
+        return FileResponse(settings_html_path())
 
     # --- embeddable workspace (V7.4) -----------------------------------------
     # The embed shell is served twice — bare, and pinned to one run — but it is the

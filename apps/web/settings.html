@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Script2Video Studio 供应商密钥</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-soft: #f9fafb;
+        --border: #d9e0ea;
+        --text: #172033;
+        --muted: #617089;
+        --blue: #2563eb;
+        --blue-soft: #e8f0ff;
+        --green: #13934a;
+        --green-soft: #e9f8ef;
+        --amber: #b76b00;
+        --amber-soft: #fff4de;
+        --red: #c43838;
+        --red-soft: #fff0f0;
+        --purple: #6d4aff;
+        --purple-soft: #f0edff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration: none;
+      }
+
+      .shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px 24px 64px;
+      }
+
+      .page-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .page-head h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: -0.01em;
+      }
+
+      .page-head p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 720px;
+        line-height: 1.6;
+      }
+
+      .head-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        padding: 7px 12px;
+      }
+
+      button:hover {
+        border-color: #b9c5d6;
+      }
+
+      button.primary {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      button.primary:hover {
+        background: #1d4fd8;
+      }
+
+      button.subtle {
+        background: var(--panel-soft);
+      }
+
+      button.danger {
+        color: var(--red);
+        border-color: #f0c6c6;
+        background: #fffafa;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .callout {
+        background: var(--blue-soft);
+        border: 1px solid #cfe0ff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 18px;
+        line-height: 1.65;
+      }
+
+      .callout strong {
+        color: #1c3fa8;
+      }
+
+      .callout code {
+        background: #fff;
+        border: 1px solid #cfe0ff;
+        border-radius: 5px;
+        padding: 1px 5px;
+        font-size: 12.5px;
+      }
+
+      .status-line {
+        margin-bottom: 14px;
+        padding: 10px 13px;
+        border-radius: 9px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-line.ok {
+        background: var(--green-soft);
+        border-color: #bfe8cf;
+        color: var(--green);
+      }
+
+      .status-line.warn {
+        background: var(--amber-soft);
+        border-color: #f0dcae;
+        color: var(--amber);
+      }
+
+      .status-line.bad {
+        background: var(--red-soft);
+        border-color: #f0c6c6;
+        color: var(--red);
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        margin-bottom: 18px;
+        overflow: hidden;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel-soft);
+      }
+
+      .panel-head h2 {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 12px;
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .pill.ok {
+        background: var(--green-soft);
+        border-color: #bfe8cf;
+        color: var(--green);
+      }
+
+      .pill.warn {
+        background: var(--amber-soft);
+        border-color: #f0dcae;
+        color: var(--amber);
+      }
+
+      .pill.bad {
+        background: var(--red-soft);
+        border-color: #f0c6c6;
+        color: var(--red);
+      }
+
+      .pill.info {
+        background: var(--purple-soft);
+        border-color: #dad2ff;
+        color: var(--purple);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      .field label {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      textarea {
+        font: inherit;
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid #cfe0ff;
+        border-color: var(--blue);
+      }
+
+      .secret-row {
+        display: grid;
+        grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .secret-row .var-name {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12.5px;
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 8px 10px;
+        color: var(--muted);
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 4px;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.6;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 11px 10px;
+        border-bottom: 1px solid #edf1f6;
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 600;
+        background: var(--panel-soft);
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      .provider-name {
+        font-weight: 600;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12.5px;
+      }
+
+      .secret-chip {
+        display: block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.7;
+        word-break: break-all;
+      }
+
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .row-actions button {
+        padding: 4px 9px;
+        font-size: 12.5px;
+      }
+
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 34px 12px;
+        line-height: 1.7;
+      }
+
+      .check-result {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 9px;
+        background: var(--panel-soft);
+        border: 1px solid var(--border);
+        line-height: 1.65;
+        font-size: 13px;
+      }
+
+      .check-result.ok {
+        background: var(--green-soft);
+        border-color: #bfe8cf;
+      }
+
+      .check-result.bad {
+        background: var(--red-soft);
+        border-color: #f0c6c6;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      @media (max-width: 860px) {
+        .form-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .secret-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="page-head">
+        <div>
+          <h1>供应商密钥</h1>
+          <p>
+            在这里维护 TTS、图像、数字人等供应商的 API Key。保存后下一次工具调用即生效，<strong>不需要重启服务</strong>。
+          </p>
+        </div>
+        <div class="head-actions">
+          <button id="refreshButton" class="subtle" type="button">刷新</button>
+          <a href="/dashboard"><button type="button">返回仪表盘</button></a>
+        </div>
+      </header>
+
+      <div class="callout">
+        <strong>取值顺序：这里保存的密钥优先于 <code>.env</code> 环境变量。</strong>
+        两边都配了同一个变量时，以本页为准；本页没有配置时才回落到环境变量。密钥提交后只以掩码形式回显（例如
+        <code>sk-…3f9a</code>），完整值不会再出现在任何接口响应里。
+      </div>
+
+      <div id="statusLine" class="status-line">准备加载供应商密钥。</div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 id="formTitle">新增密钥</h2>
+          <span id="formModeBadge" class="pill">新建</span>
+        </div>
+        <div class="panel-body">
+          <form id="credentialForm" class="form-grid">
+            <div class="field">
+              <label for="providerSelect">供应商</label>
+              <select id="providerSelect" required>
+                <option value="dashscope">dashscope（TTS / 图像 / 数字人）</option>
+                <option value="elevenlabs">elevenlabs（BGM 音乐）</option>
+                <option value="kling">kling（视频生成）</option>
+                <option value="custom">其他（手动填写变量名）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="labelInput">备注名称（可选）</label>
+              <input id="labelInput" placeholder="例如：生产环境主 key" />
+            </div>
+            <div class="field full">
+              <label>密钥变量</label>
+              <div id="secretInputs"></div>
+              <p class="hint">
+                变量名必须是工具目录声明的环境变量名（<span class="mono">DASHSCOPE_API_KEY</span> /
+                <span class="mono">ELEVENLABS_API_KEY</span> /
+                <span class="mono">KLING_ACCESS_KEY</span>）。填错的名字不会生效，也不会报错。
+              </p>
+            </div>
+            <div class="field full form-actions">
+              <button class="primary" id="submitButton" type="submit">保存密钥</button>
+              <button class="subtle" id="cancelEditButton" type="button" hidden>取消编辑</button>
+              <span class="hint" id="submitHint"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>已配置的密钥</h2>
+          <span id="credentialCount" class="pill">0 条</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>供应商</th>
+                <th>备注</th>
+                <th>状态</th>
+                <th>密钥</th>
+                <th>存储方式</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="credentialTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty" hidden>
+          还没有配置任何供应商密钥。<br />
+          没有配置时，相关工具在预检里会显示 <span class="mono">unavailable</span>，流程会停在审核关口——那是设计行为，不是故障。
+        </div>
+      </section>
+
+      <div id="checkResult" class="check-result" hidden></div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      const PROVIDER_PRESETS = {
+        dashscope: ["DASHSCOPE_API_KEY"],
+        elevenlabs: ["ELEVENLABS_API_KEY"],
+        kling: ["KLING_ACCESS_KEY", "KLING_SECRET_KEY"],
+        custom: [""],
+      };
+
+      const STATUS_LABELS = {
+        active: "启用中",
+        disabled: "已停用",
+      };
+
+      const SOURCE_LABELS = {
+        none: "无密钥",
+        inline: "库内明文",
+        vault: "加密托管",
+        mixed: "部分迁移",
+        locked: "密钥不可解",
+      };
+
+      const state = {
+        credentials: [],
+        editingId: null,
+        busy: false,
+      };
+
+      function setStatus(message, tone = "") {
+        const line = $("statusLine");
+        line.textContent = message;
+        line.className = `status-line ${tone}`.trim();
+      }
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        if (!response.ok) {
+          let detail = `${response.status} ${response.statusText}`;
+          try {
+            const body = await response.json();
+            if (typeof body.detail === "string") {
+              detail = body.detail;
+            } else if (body.detail && body.detail.message) {
+              detail = `${body.detail.code}: ${body.detail.message}`;
+            }
+          } catch (error) {
+            // A non-JSON body keeps the status line above; nothing to add.
+          }
+          if (response.status === 403) {
+            detail = "当前身份没有 provider:manage 权限（这是租户级权限，需要团队 owner/admin）。";
+          }
+          throw new Error(detail);
+        }
+        if (response.status === 204) {
+          return null;
+        }
+        return response.json();
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
+        });
+      }
+
+      function renderSecretInputs(provider, presetNames = []) {
+        const container = $("secretInputs");
+        const names = presetNames.length ? presetNames : PROVIDER_PRESETS[provider] || [""];
+        container.innerHTML = "";
+        names.forEach((name, index) => {
+          const row = document.createElement("div");
+          row.className = "secret-row";
+          const editableName = provider === "custom" && !state.editingId;
+          row.innerHTML = `
+            ${
+              editableName
+                ? `<input class="secret-var" data-index="${index}" placeholder="环境变量名，如 DASHSCOPE_API_KEY" value="${escapeHtml(name)}" />`
+                : `<span class="var-name">${escapeHtml(name)}</span><input type="hidden" class="secret-var" value="${escapeHtml(name)}" />`
+            }
+            <input class="secret-value" type="password" autocomplete="new-password"
+                   placeholder="${state.editingId ? "留空则保持原值" : "在此粘贴完整密钥"}" />
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      function renderTable() {
+        const body = $("credentialTableBody");
+        const empty = $("emptyState");
+        $("credentialCount").textContent = `${state.credentials.length} 条`;
+        if (!state.credentials.length) {
+          body.innerHTML = "";
+          empty.hidden = false;
+          return;
+        }
+        empty.hidden = true;
+        body.innerHTML = state.credentials
+          .map((credential) => {
+            const statusClass = credential.status === "active" ? "ok" : "warn";
+            const secretLines = (credential.secret_names || [])
+              .map((name) => {
+                const preview = (credential.secret_preview || {})[name] || "（不显示）";
+                return `<span class="secret-chip">${escapeHtml(name)} = ${escapeHtml(preview)}</span>`;
+              })
+              .join("");
+            const sourceLabel = SOURCE_LABELS[credential.secret_source] || credential.secret_source || "-";
+            const sourceClass = credential.secret_source === "locked" ? "bad" : "info";
+            const checkHint = credential.last_check_status
+              ? `<span class="secret-chip">上次检查：${escapeHtml(credential.last_check_status)}</span>`
+              : "";
+            return `
+              <tr>
+                <td class="provider-name">${escapeHtml(credential.provider)}</td>
+                <td>${escapeHtml(credential.label || "-")}</td>
+                <td><span class="pill ${statusClass}">${STATUS_LABELS[credential.status] || credential.status}</span>${checkHint}</td>
+                <td>${secretLines || '<span class="muted">-</span>'}</td>
+                <td><span class="pill ${sourceClass}">${escapeHtml(sourceLabel)}</span></td>
+                <td>
+                  <div class="row-actions">
+                    <button type="button" data-action="check" data-id="${escapeHtml(credential.credential_id)}">检查可用性</button>
+                    <button type="button" data-action="edit" data-id="${escapeHtml(credential.credential_id)}">改密钥</button>
+                    <button type="button" data-action="toggle" data-id="${escapeHtml(credential.credential_id)}">
+                      ${credential.status === "active" ? "停用" : "启用"}
+                    </button>
+                    <button class="subtle" type="button" data-action="rotate" data-id="${escapeHtml(credential.credential_id)}">加密托管</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadCredentials() {
+        try {
+          const list = await api("/api/provider-credentials");
+          state.credentials = list || [];
+          renderTable();
+          setStatus(`已加载 ${state.credentials.length} 条供应商密钥。`, state.credentials.length ? "ok" : "");
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "bad");
+        }
+      }
+
+      function findCredential(id) {
+        return state.credentials.find((item) => item.credential_id === id);
+      }
+
+      function enterEditMode(id) {
+        const credential = findCredential(id);
+        if (!credential) {
+          return;
+        }
+        state.editingId = id;
+        $("formTitle").textContent = `更新密钥：${credential.provider}`;
+        $("formModeBadge").textContent = "编辑";
+        $("formModeBadge").className = "pill warn";
+        $("submitButton").textContent = "保存新值";
+        $("cancelEditButton").hidden = false;
+        $("providerSelect").value = PROVIDER_PRESETS[credential.provider] ? credential.provider : "custom";
+        $("providerSelect").disabled = true;
+        $("labelInput").value = credential.label || "";
+        renderSecretInputs(credential.provider, credential.secret_names || []);
+        $("submitHint").textContent = "只填要更新的变量，留空的保持不变。";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function exitEditMode() {
+        state.editingId = null;
+        $("formTitle").textContent = "新增密钥";
+        $("formModeBadge").textContent = "新建";
+        $("formModeBadge").className = "pill";
+        $("submitButton").textContent = "保存密钥";
+        $("cancelEditButton").hidden = true;
+        $("providerSelect").disabled = false;
+        $("labelInput").value = "";
+        $("submitHint").textContent = "";
+        renderSecretInputs($("providerSelect").value);
+        $("credentialForm").reset();
+        renderSecretInputs("dashscope");
+      }
+
+      function collectSecretValues({ keepEmpty = false } = {}) {
+        const values = {};
+        document.querySelectorAll(".secret-row").forEach((row) => {
+          const name = (row.querySelector(".secret-var")?.value || "").trim();
+          const value = row.querySelector(".secret-value")?.value ?? "";
+          if (!name) {
+            return;
+          }
+          if (keepEmpty || value) {
+            values[name] = value;
+          }
+        });
+        return values;
+      }
+
+      async function submitForm(event) {
+        event.preventDefault();
+        if (state.busy) {
+          return;
+        }
+        const provider = $("providerSelect").value;
+        const secretValues = collectSecretValues({ keepEmpty: false });
+        if (!Object.keys(secretValues).length) {
+          setStatus("请至少填写一个密钥值。", "warn");
+          return;
+        }
+        state.busy = true;
+        $("submitButton").disabled = true;
+        try {
+          if (state.editingId) {
+            await api(`/api/provider-credentials/${state.editingId}`, {
+              method: "PATCH",
+              body: JSON.stringify({ secret_values: secretValues }),
+            });
+            setStatus("密钥已更新，下一次工具调用即使用新值。", "ok");
+            exitEditMode();
+          } else {
+            await api("/api/provider-credentials", {
+              method: "POST",
+              body: JSON.stringify({
+                provider,
+                label: $("labelInput").value.trim() || null,
+                secret_values: secretValues,
+              }),
+            });
+            setStatus("密钥已保存，下一次工具调用即使用新值。", "ok");
+            exitEditMode();
+          }
+          await loadCredentials();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`, "bad");
+        } finally {
+          state.busy = false;
+          $("submitButton").disabled = false;
+        }
+      }
+
+      async function toggleStatus(id) {
+        const credential = findCredential(id);
+        if (!credential) {
+          return;
+        }
+        const nextStatus = credential.status === "active" ? "disabled" : "active";
+        try {
+          await api(`/api/provider-credentials/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: nextStatus }),
+          });
+          setStatus(
+            nextStatus === "disabled"
+              ? `已停用 ${credential.provider}，相关工具会立刻显示为不可用。`
+              : `已启用 ${credential.provider}。`,
+            "ok",
+          );
+          await loadCredentials();
+        } catch (error) {
+          setStatus(`切换状态失败：${error.message}`, "bad");
+        }
+      }
+
+      async function checkCredential(id) {
+        const box = $("checkResult");
+        box.hidden = false;
+        box.className = "check-result";
+        box.textContent = "正在检查……";
+        try {
+          const result = await api(`/api/provider-credentials/${id}/check`, { method: "POST" });
+          const toolLines = (result.tool_statuses || [])
+            .map((tool) => `${tool.tool_key || tool.tool || "tool"}: ${tool.status}`)
+            .join("、");
+          box.className = `check-result ${result.ok ? "ok" : "bad"}`;
+          box.innerHTML = `
+            <strong>${result.ok ? "可用" : "不可用"}</strong>（${escapeHtml(result.provider)}）<br />
+            ${escapeHtml(result.message || "")}
+            ${result.env_var_names?.length ? `<br />变量：<span class="mono">${escapeHtml(result.env_var_names.join(", "))}</span>` : ""}
+            ${result.missing_dependencies?.length ? `<br />缺少依赖：${escapeHtml(result.missing_dependencies.join(", "))}` : ""}
+            ${toolLines ? `<br />工具状态：${escapeHtml(toolLines)}` : ""}
+          `;
+        } catch (error) {
+          box.className = "check-result bad";
+          box.textContent = `检查失败：${error.message}`;
+        }
+      }
+
+      async function rotateCredential(id) {
+        try {
+          await api(`/api/provider-credentials/${id}/rotate`, { method: "POST" });
+          setStatus("已加密托管该密钥（需要配置 SECRET_ENCRYPTION_KEY 才会真正生效）。", "ok");
+          await loadCredentials();
+        } catch (error) {
+          setStatus(`加密托管失败：${error.message}`, "bad");
+        }
+      }
+
+      function onTableClick(event) {
+        const button = event.target.closest("button[data-action]");
+        if (!button) {
+          return;
+        }
+        const { action, id } = button.dataset;
+        if (action === "check") {
+          checkCredential(id);
+        } else if (action === "edit") {
+          enterEditMode(id);
+        } else if (action === "toggle") {
+          toggleStatus(id);
+        } else if (action === "rotate") {
+          rotateCredential(id);
+        }
+      }
+
+      $("providerSelect").addEventListener("change", (event) => {
+        if (!state.editingId) {
+          renderSecretInputs(event.target.value);
+        }
+      });
+      $("credentialForm").addEventListener("submit", submitForm);
+      $("cancelEditButton").addEventListener("click", exitEditMode);
+      $("refreshButton").addEventListener("click", loadCredentials);
+      $("credentialTableBody").addEventListener("click", onTableClick);
+
+      renderSecretInputs("dashscope");
+      loadCredentials();
+    </script>
+  </body>
+</html>

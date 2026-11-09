@@ -73,7 +73,9 @@ run 会走到第一道人工审核关口就**停下**：
 curl -s http://127.0.0.1:8080/api/pipelines | python3 -m json.tool | head -40
 ```
 
-五条 pipeline（`avatar_spokesperson` / `animated_explainer` / `source_clip_factory` /
-`screen_demo` / 兼容键 `spokesperson_ad`）各自的适用场景写在 `docs/PLATFORM_PLAN.md`；
-`pipeline_key` 直接传给建 run 的请求即可（示例里是 `SCRIPT2VIDEO_PIPELINE_KEY`）。
+十条 pipeline：正式版 `avatar_spokesperson`；beta 有 `animated_explainer` /
+`source_clip_factory` / `screen_demo` / `hybrid_story` / `localization_dub` /
+`talking_head` / `podcast_repurpose` / `cinematic`；兼容键 `spokesperson_ad` 仍是 `draft`。
+每条线的阶段指导在 `docs/pipeline-strategies/`，`pipeline_key` 直接传给建 run 的请求即可
+（示例里是 `SCRIPT2VIDEO_PIPELINE_KEY`）。
 注意 `spokesperson_ad` 是历史兼容键，当前仍是 `draft`（见 `docs/RELEASE_CHECKLIST.md` §5）。

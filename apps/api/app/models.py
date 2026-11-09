@@ -1932,6 +1932,52 @@ class EventLog(BaseModel):
     created_at: datetime
 
 
+class RunDecision(BaseModel):
+    """One recorded choice: the winner, the alternatives, and the reasoning.
+
+    ``confidence`` is ``None`` whenever the decision has no measurable score —
+    a human review decision does not, and a fabricated 1.0 would read as
+    certainty the system cannot back up. ``confidence_basis`` names the
+    measurement that produced the number when there is one.
+    """
+
+    decision_id: str
+    run_id: str
+    sequence: int
+    category: str
+    subject: str
+    stage_key: str | None = None
+    decision: str
+    chosen: dict[str, Any] = Field(default_factory=dict)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+    confidence: float | None = None
+    confidence_basis: str | None = None
+    rationale: str | None = None
+    actor_type: str = "system"
+    actor_id: str | None = None
+    actor_display_name: str | None = None
+    source_artifact_id: str | None = None
+    created_at: datetime
+
+
+class RunDecisionLog(BaseModel):
+    """The read model behind ``GET /api/runs/{run_id}/decision-log``.
+
+    ``count`` is the number of entries in *this* response and ``total`` is how
+    many the same query has in store; ``truncated`` is true when a ``limit`` cut
+    the list. Both numbers are published because a truncated audit view that
+    stays silent about it reads as a complete one.
+    """
+
+    run_id: str
+    count: int
+    total: int
+    truncated: bool = False
+    categories: list[str]
+    history_included: bool
+    entries: list[RunDecision]
+
+
 class ProviderCallbackResult(BaseModel):
     matched: bool
     provider: str

@@ -390,18 +390,18 @@ curl -fsS https://studio.example.com/api/deployment | jq
   "settings": { "maintenance_mode": false, "last_backup_at": "2026-10-12T03:15:00", ... },
   "app_version": "1.1.0",
   "environment": "production",
-  "migration": { "head": "20261012_0022", "current": "20261012_0022",
+  "migration": { "head": "20261109_0023", "current": "20261109_0023",
                  "pending": [], "up_to_date": true },
   "capabilities": { "secret_encryption": true, "provider_callback_signature": true,
                     "asset_link_secret_secure": true, "structured_logs": true,
                     "webhook_dispatch": true },
-  "table_count": 36
+  "table_count": 37
 }
 ```
 
 `table_count` counts every table the connected schema has, **including** Alembic's own
-`alembic_version` bookkeeping row-table — that is why it reads 36 while
-`scripts/deployment_preflight.py` (which excludes it) reports 35 application tables. Both
+`alembic_version` bookkeeping row-table — that is why it reads 37 while
+`scripts/deployment_preflight.py` (which excludes it) reports 36 application tables. Both
 numbers are right; they answer different questions.
 
 `migration.up_to_date: false` with a non-empty `pending` is the one state worth
@@ -418,7 +418,7 @@ docker compose -f docker-compose.prod.yml exec -T api python scripts/verify_revi
 
 It is re-runnable against the same database (fixed slugs are reused, idempotent
 operations stay idempotent), so it can be run after every upgrade rather than
-against a fresh environment. **390 checks** by default, **394** when
+against a fresh environment. **408 checks** by default, **412** when
 `SECRET_ENCRYPTION_KEY` and `PROVIDER_CALLBACK_SECRET` are both configured — §23
 adapts to the deployment instead of demanding it adopt optional features. It is
 also adaptive in the other direction: §11 skips three "intent downgrade" checks on
@@ -469,6 +469,39 @@ events.
 | `ASSET_LINK_SECRET` | Existing signed asset links stop verifying after their TTL | Restart. Old links keep working until they expire (verification is not refused, only minting). |
 | `PROVIDER_CALLBACK_SECRET` | Unsigned/mis-signed callbacks → 401 | Update the upstream's signing config first, then the deployment, or callbacks fail in the gap. |
 | Webhook subscription secret | That one subscriber | Self-service: `POST /api/webhooks/{id}/rotate-secret`, then update the subscriber. |
+
+### Rotating a provider key without a restart
+
+Provider credentials are not tied to the process lifetime. Both the API (per
+request) and the worker (per claimed job) rebuild their store, and the store
+resolves credentials from the database **before** it looks at the environment —
+so a key written through the API is the one the next tool call uses. No
+`docker compose up`, no `systemctl restart`, no downtime.
+
+Two ways to do it:
+
+- **Browser**: `/settings` (the "供应商密钥" button on the dashboard). List,
+  create, rotate the value, check availability, disable, re-enable.
+- **API**: `POST /api/provider-credentials` to create, `PATCH
+  /api/provider-credentials/{id}` with `{"secret_values": {...}}` to change a
+  value, `POST .../{id}/check` to verify, `PATCH` with `{"status": "disabled"}`
+  to revoke. All require `provider:manage` (tenant-level: team owner or admin).
+
+Order that keeps a bad key from taking the pipeline down between two steps:
+
+1. Create the **new** credential (or write the new value) and run `check`. It
+   must report `ok: true` before anything else.
+2. Only then disable the old one. Disabling is immediately visible: the next
+   tool-catalogue resolution marks every tool of that provider `unavailable`,
+   and a preflight taken afterwards reports the dependent stages `blocked` (or
+   `degraded` where the catalogue declares a fallback tool).
+3. Keep the disabled row. There is deliberately no `DELETE`: a credential that
+   can be silently removed is a credential nobody can audit. Re-enable it to roll
+   back.
+
+Precedence, restated because it bites: **database beats `.env`**. If a key in
+`.env` looks like it is being ignored, a stored credential for the same variable
+is the reason — check `/settings` before touching the container.
 
 ---
 

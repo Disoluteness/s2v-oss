@@ -386,8 +386,10 @@ def test_policy_and_open_endpoints_partition_every_route():
     # tenant scope — seating a login identity is roster administration), and the
     # three /api/auth operations are open (login is identity bootstrap; logout
     # and introspection take the session token itself as the credential).
-    assert len(registered) == 156
-    assert len(gated) == 137
+    # P2 added one: GET /api/runs/{run_id}/decision-log rides ``run:read`` at run
+    # scope, the same key that already guards the board and the artifact list.
+    assert len(registered) == 157
+    assert len(gated) == 138
     assert len(open_paths) == 19
 
 

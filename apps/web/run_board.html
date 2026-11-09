@@ -221,6 +221,28 @@
         padding: 14px;
       }
 
+      /* One filter chip row in the panel header: the category list is short
+         (4-5 keys) and re-reading it from the API per page load is cheaper than
+         a config table nobody would maintain. */
+      .decision-tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .decision-tools select {
+        width: auto;
+        height: 28px;
+        padding: 0 6px;
+        font-size: 12px;
+      }
+
+      .decision-chosen {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+
       .lane-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -545,9 +567,15 @@
           <section class="panel">
             <div class="panel-header">
               <h2>决策日志</h2>
-              <span id="decisionCount" class="pill">0</span>
+              <div class="decision-tools">
+                <select id="decisionCategory" title="按类别筛选">
+                  <option value="">全部类别</option>
+                </select>
+                <span id="decisionCount" class="pill">0</span>
+              </div>
             </div>
             <div class="panel-body">
+              <div id="decisionHint" class="muted"></div>
               <div id="decisionLog" class="stack"></div>
             </div>
           </section>
@@ -592,6 +620,10 @@
         reviewRequestId: null,
         reviewDetail: null,
         pendingReviewRequestId: null,
+        // The persisted decision log, including every re-plan. ``null`` means the
+        // request failed, in which case the panel falls back to the copy the
+        // execution plan embedded in the board.
+        decisionLog: null,
       };
       const $ = (id) => document.getElementById(id);
 
@@ -851,10 +883,25 @@
         try {
           state.board = await api(`/api/runs/${runId}/board`);
           $("workspaceLink").href = state.board.workspace_url;
+          // History, not just the current view: the panel needs both counts to
+          // tell "re-selected twice" apart from "selected once".
+          state.decisionLog = await loadDecisionLog(runId);
           render();
           setStatus("已同步");
         } catch (error) {
           setStatus(`加载失败：${error.message}`, "error");
+        }
+      }
+
+      async function loadDecisionLog(runId) {
+        try {
+          return await api(
+            `/api/runs/${runId}/decision-log?include_history=true&limit=200`,
+          );
+        } catch (error) {
+          // A failed log must not blank the board: the plan artifact still
+          // carries the same decisions, just without the history.
+          return null;
         }
       }
 
@@ -870,7 +917,7 @@
         renderArtifacts(board.artifact_timeline || []);
         renderOutputs(board);
         renderIssues(board);
-        renderDecisionLog(board.decision_log || []);
+        renderDecisionLog(state.decisionLog, board.decision_log || []);
         renderCostLog(board.cost_log || [], board.usage_summary || {});
         renderJobLog(board.job_log || []);
         renderEventLog(board.event_log || []);
@@ -895,6 +942,7 @@
         ].forEach((id) => ($(id).innerHTML = '<div class="empty">暂无数据</div>'));
         $("reviewCount").textContent = "0";
         $("reviewCount").className = "pill";
+        $("decisionHint").textContent = "";
       }
 
       function renderSummary(board) {
@@ -1407,8 +1455,152 @@
         );
       }
 
-      function renderDecisionLog(decisions) {
+      // The persisted log groups by ``(category, subject)``; the labels exist so
+      // the panel says what kind of choice it is instead of echoing a key.
+      const decisionCategoryLabels = {
+        tool_selection: "工具选择",
+        review_decision: "人工审核",
+        quality_downgrade: "质量降级确认",
+        paid_provider_consent: "付费供应商确认",
+      };
+
+      function decisionCategoryLabel(category) {
+        return decisionCategoryLabels[category] || category || "决策";
+      }
+
+      function decisionTone(decision) {
+        if (decision === "blocked" || decision === "reject" || decision === "retract_paid_provider") {
+          return "bad";
+        }
+        if (
+          [
+            "request_changes",
+            "use_degraded_tool",
+            "use_tool_below_intent",
+            "skip_optional",
+            "accept_intent_downgrade",
+          ].includes(decision)
+        ) {
+          return "warn";
+        }
+        if (["approve", "use_tool", "accept_paid_provider"].includes(decision)) {
+          return "good";
+        }
+        return "info";
+      }
+
+      function decisionChosenSummary(entry) {
+        const chosen = entry.chosen || {};
+        if (entry.category === "tool_selection") {
+          const tool = chosen.tool_key || "未选择工具";
+          const parts = [chosen.provider, chosen.runtime].filter(Boolean).join(", ");
+          const score = chosen.score === null || chosen.score === undefined ? "" : ` · 分数 ${chosen.score}`;
+          return parts ? `${tool} (${parts})${score}` : `${tool}${score}`;
+        }
+        if (entry.category === "review_decision") {
+          const round = chosen.round === null || chosen.round === undefined ? "" : `第 ${chosen.round} 轮`;
+          return [`结论 ${chosen.decision || entry.decision}`, round].filter(Boolean).join(" · ");
+        }
+        const pairs = Object.entries(chosen)
+          .filter(([, value]) => value !== null && value !== undefined && value !== "")
+          .map(([key, value]) => `${key}=${value}`);
+        return pairs.join(" · ");
+      }
+
+      // Deliberately not phrased as a probability: the number is the margin over
+      // the runner-up, and a bare percentage would be read as confidence in the
+      // choice rather than as distance from the alternative.
+      function decisionConfidenceLabel(entry) {
+        if (entry.confidence === null || entry.confidence === undefined) return "";
+        const percent = Math.round(Number(entry.confidence) * 100);
+        const basis =
+          entry.confidence_basis === "uncontested" ? "无竞争者" : `领先次优 ${percent}%`;
+        return basis;
+      }
+
+      function syncDecisionCategories(categories) {
+        const select = $("decisionCategory");
+        const keys = categories.join(",");
+        // Rebuild only when the set actually changed, otherwise the operator's
+        // selection would be reset by every refresh.
+        if (select.dataset.categories === keys) return;
+        const current = select.value;
+        select.dataset.categories = keys;
+        select.innerHTML = ['<option value="">全部类别</option>']
+          .concat(
+            categories.map(
+              (category) =>
+                `<option value="${escapeHtml(category)}">${escapeHtml(decisionCategoryLabel(category))}</option>`,
+            ),
+          )
+          .join("");
+        select.value = categories.includes(current) ? current : "";
+      }
+
+      function renderDecisionLog(log, fallback) {
+        const entries = log && Array.isArray(log.entries) ? log.entries : [];
+        if (!entries.length) {
+          renderPlanDecisionFallback(fallback || []);
+          return;
+        }
+        // Current view: the highest sequence wins for a (category, subject) pair.
+        const current = new Map();
+        entries.forEach((entry) => current.set(`${entry.category}|${entry.subject}`, entry));
+        const filter = $("decisionCategory").value;
+        const rows = [...current.values()]
+          .sort((left, right) => left.sequence - right.sequence)
+          .filter((entry) => !filter || entry.category === filter);
+
+        syncDecisionCategories(log.categories || []);
+        $("decisionCount").textContent = String(rows.length);
+        // A truncated audit view must say so — the reader would otherwise assume
+        // the list is the whole story.
+        const truncation =
+          log && log.truncated
+            ? `接口只返回了 ${log.count} / 共 ${log.total} 条，较早的决策未显示。`
+            : "";
+        $("decisionHint").textContent =
+          truncation +
+          `当前结论 ${rows.length} 条；含重规划的历史共 ${entries.length} 条。` +
+          `写入点：执行计划、人工审核、质量降级确认、付费供应商确认。`;
+        if (!rows.length) {
+          $("decisionLog").innerHTML = '<div class="empty">该类别暂无决策记录</div>';
+          return;
+        }
+        $("decisionLog").innerHTML = rows
+          .map((entry) => {
+            const candidates = Array.isArray(entry.candidates) ? entry.candidates : [];
+            const confidence = decisionConfidenceLabel(entry);
+            const actor =
+              entry.actor_type === "human"
+                ? `由 ${escapeHtml(entry.actor_display_name || entry.actor_id || "人工")} 决定`
+                : "系统决定";
+            return `
+              <div class="item">
+                <div class="item-title">
+                  ${escapeHtml(entry.subject)}
+                  <span class="pill ${decisionTone(entry.decision)}">${escapeHtml(decisionCategoryLabel(entry.category))}</span>
+                </div>
+                <div class="muted">${escapeHtml(stageLabel(entry.stage_key || "-"))} · 结论 ${escapeHtml(entry.decision)}</div>
+                <div class="decision-chosen">${escapeHtml(decisionChosenSummary(entry))}</div>
+                <div class="muted">${escapeHtml(
+                  [candidates.length ? `${candidates.length} 个备选` : "无备选", confidence]
+                    .filter(Boolean)
+                    .join(" · "),
+                )}</div>
+                <div class="muted">${escapeHtml(entry.rationale || "")}</div>
+                <div class="muted">${actor}${entry.source_artifact_id ? ` · 来源产物 ${escapeHtml(entry.source_artifact_id)}` : ""}</div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      // Fallback for an older deployment (or a failed request): the execution
+      // plan still embeds the same decisions, minus the history.
+      function renderPlanDecisionFallback(decisions) {
         $("decisionCount").textContent = String(decisions.length);
+        $("decisionHint").textContent = "决策日志接口不可用，以下来自执行计划产物（无历史）。";
         if (!decisions.length) {
           $("decisionLog").innerHTML = '<div class="empty">暂无决策日志</div>';
           return;
@@ -1640,6 +1832,9 @@
         loadBoard($("runIdInput").value.trim());
       });
       $("refreshButton").addEventListener("click", () => loadBoard(state.runId || $("runIdInput").value.trim()));
+      $("decisionCategory").addEventListener("change", () => {
+        if (state.board) render();
+      });
 
       const params = new URLSearchParams(window.location.search);
       const initialRunId = params.get("run_id");

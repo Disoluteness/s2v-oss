@@ -799,6 +799,70 @@ def test_database_store_source_clip_factory_smoke_reaches_final_review(tmp_path)
     assert "publish_package" not in current_payloads
 
 
+@pytest.mark.parametrize(
+    ("pipeline_key", "raw_script"),
+    [
+        ("talking_head", "把这段访谈切成 3 条竖版短片。"),
+        ("podcast_repurpose", "把这一期播客切成 3 条短视频。"),
+        ("cinematic", "用这些镜头剪一支 30 秒品牌预告。"),
+    ],
+)
+def test_database_store_p1_media_lines_reach_final_review(
+    tmp_path, pipeline_key: str, raw_script: str
+) -> None:
+    """The three P1 lines share the clipping kernel; each must reach final review.
+
+    They differ in selection criteria and capability requirements, not in the
+    orchestration shape, so one parameterised smoke is enough to prove the
+    stages resolve and the review gates fire.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / (pipeline_key + '.db')}")
+    Base.metadata.create_all(engine)
+    pipeline = PipelineLoader().get_pipeline(pipeline_key)
+    session = Session(engine)
+    store = DatabaseStore(session)
+    project = store.create_project(ProjectCreate(title=pipeline.display_name))
+    run = store.create_run(
+        project_id=project.project_id,
+        payload=RunCreate(
+            pipeline_key=pipeline_key,
+            raw_script=raw_script,
+            target_duration_seconds=30,
+            target_platform="douyin",
+        ),
+        pipeline=pipeline,
+    )
+    started = store.start_run(run.run_id)
+    source_reviewed = store.review_stage(
+        run.run_id,
+        "source_ingest",
+        ApprovalRequest(decision="approved"),
+    )
+    candidates_reviewed = store.review_stage(
+        run.run_id,
+        "clip_selection",
+        ApprovalRequest(decision="approved"),
+    )
+    artifacts = store.list_artifacts(run.run_id, current_only=True)
+    session.close()
+
+    assert started is not None
+    assert started.pipeline_key == pipeline_key
+    assert started.current_stage_key == "source_ingest"
+    assert source_reviewed is not None
+    assert source_reviewed.current_stage_key == "clip_selection"
+    assert candidates_reviewed is not None
+    assert candidates_reviewed.status == RunStatus.WAITING_REVIEW
+    assert candidates_reviewed.current_stage_key == "final_review"
+    artifact_types = {artifact.artifact_type for artifact in artifacts}
+    assert {
+        "source_media_review",
+        "media_analysis_report",
+        "clip_candidate_list",
+        "clip_export_manifest",
+    }.issubset(artifact_types)
+
+
 def test_database_store_ingests_source_media_manifest(tmp_path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'source-media-ingest.db'}")
     Base.metadata.create_all(engine)

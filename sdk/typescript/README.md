@@ -246,7 +246,7 @@ Register an endpoint, then verify what arrives:
 ```ts
 import { Script2VideoClient, verifyWebhookSignature, SIGNATURE_HEADER } from "s2v-client";
 
-const client = new Script2VideoClient({ baseUrl: "http://localhost:8080", apiKey: "s2v_..." });
+const client = new Script2VideoClient({ baseUrl: "http://localhost:18080", apiKey: "s2v_..." });
 
 const subscription = await client.createWebhookSubscription(
   "ops-hook", "https://ops.internal/hooks/s2v", ["run.completed", "stage.waiting_review"],

@@ -40,6 +40,7 @@ from apps.api.app.db_models import (
     ReviewCommentRecord,
     ReviewDecisionRecord,
     ReviewRequestRecord,
+    RunDecisionRecord,
     StageRunRecord,
     StylePresetRecord,
     TeamMembershipRecord,
@@ -144,6 +145,7 @@ from apps.api.app.models import (
     ReviewRequestDetail,
     ReviewRequestStatus,
     RunCreate,
+    RunDecision,
     RunStatus,
     StageRun,
     StageStatus,
@@ -2636,6 +2638,170 @@ class EventRepository:
         statement = select(EventLogRecord.sequence).where(EventLogRecord.run_id == run_id)
         sequences = list(self.session.scalars(statement))
         return max(sequences) + 1 if sequences else 1
+
+
+def run_decision_from_record(record: RunDecisionRecord) -> RunDecision:
+    """Why a choice was made, in the shape the API and the board render.
+
+    ``confidence`` comes back as ``Decimal`` on MySQL and ``float`` on sqlite;
+    the DTO normalises to float so the JSON body does not vary by backend.
+    """
+
+    return RunDecision(
+        decision_id=record.id,
+        run_id=record.run_id,
+        sequence=record.sequence,
+        category=record.category,
+        subject=record.subject,
+        stage_key=record.stage_key,
+        decision=record.decision,
+        chosen=dict(record.chosen or {}),
+        candidates=list(record.candidates or []),
+        confidence=float(record.confidence) if record.confidence is not None else None,
+        confidence_basis=record.confidence_basis,
+        rationale=record.rationale,
+        actor_type=record.actor_type,
+        actor_id=record.actor_id,
+        actor_display_name=record.actor_display_name,
+        source_artifact_id=record.source_artifact_id,
+        created_at=record.created_at,
+    )
+
+
+class DecisionLogRepository:
+    """Append-only log of *reasoning*, not of edits.
+
+    Two rules make the read side simple:
+
+    * **Append-only.** Re-planning a run adds rows; it never rewrites them. The
+      history is the point — "the tool changed" is a different fact from "the
+      tool was re-selected", and only an append-only log can tell them apart.
+    * **Current = highest sequence per (category, subject).** Same convention as
+      ``review_decisions``, so a caller that only wants "what is true now" asks
+      for the default view instead of deduplicating in the client.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def next_sequence(self, run_id: str) -> int:
+        statement = select(RunDecisionRecord.sequence).where(RunDecisionRecord.run_id == run_id)
+        sequences = list(self.session.scalars(statement))
+        return max(sequences) + 1 if sequences else 1
+
+    def append(
+        self,
+        *,
+        run_id: str,
+        tenant_id: str,
+        project_id: str,
+        entry: dict[str, Any],
+    ) -> RunDecision:
+        return self.append_many(
+            run_id=run_id,
+            tenant_id=tenant_id,
+            project_id=project_id,
+            entries=[entry],
+        )[0]
+
+    def append_many(
+        self,
+        *,
+        run_id: str,
+        tenant_id: str,
+        project_id: str,
+        entries: list[dict[str, Any]],
+    ) -> list[RunDecision]:
+        if not entries:
+            return []
+        # One MAX() read for the whole batch: a plan produces one row per
+        # capability, and re-reading the sequence per row would make the write
+        # cost grow with the square of the pipeline size.
+        sequence = self.next_sequence(run_id)
+        records = [
+            RunDecisionRecord(
+                id=f"decision_{uuid4().hex[:12]}",
+                tenant_id=tenant_id,
+                project_id=project_id,
+                run_id=run_id,
+                sequence=sequence + offset,
+                category=entry["category"],
+                subject=entry["subject"],
+                stage_key=entry.get("stage_key"),
+                decision=entry["decision"],
+                chosen=entry.get("chosen") or {},
+                candidates=entry.get("candidates") or [],
+                confidence=entry.get("confidence"),
+                confidence_basis=entry.get("confidence_basis"),
+                rationale=entry.get("rationale"),
+                actor_type=entry.get("actor_type", "system"),
+                actor_id=entry.get("actor_id"),
+                actor_display_name=entry.get("actor_display_name"),
+                source_artifact_id=entry.get("source_artifact_id"),
+            )
+            for offset, entry in enumerate(entries)
+        ]
+        self.session.add_all(records)
+        self.session.flush()
+        for record in records:
+            self.session.refresh(record)
+        return [run_decision_from_record(record) for record in records]
+
+    def list_decisions(
+        self,
+        run_id: str,
+        *,
+        category: str | None = None,
+        include_history: bool = False,
+        limit: int = 200,
+    ) -> list[RunDecision]:
+        statement = select(RunDecisionRecord).where(RunDecisionRecord.run_id == run_id)
+        if category is not None:
+            statement = statement.where(RunDecisionRecord.category == category)
+        statement = statement.order_by(RunDecisionRecord.sequence)
+        records = list(self.session.scalars(statement))
+        if include_history:
+            return [run_decision_from_record(record) for record in records[-limit:]]
+        latest: dict[tuple[str, str], RunDecisionRecord] = {}
+        for record in records:
+            latest[(record.category, record.subject)] = record
+        ordered = sorted(latest.values(), key=lambda record: record.sequence)
+        return [run_decision_from_record(record) for record in ordered[-limit:]]
+
+    def total(
+        self,
+        run_id: str,
+        *,
+        category: str | None = None,
+        include_history: bool = False,
+    ) -> int:
+        """How many rows the same query *would* return without a limit.
+
+        Needed because a truncated audit log that does not say it is truncated is
+        worse than no log: the reader assumes the list is complete.
+        """
+
+        if include_history:
+            statement = select(func.count()).select_from(RunDecisionRecord)
+            statement = statement.where(RunDecisionRecord.run_id == run_id)
+            if category is not None:
+                statement = statement.where(RunDecisionRecord.category == category)
+            return int(self.session.scalar(statement) or 0)
+        distinct_subject = select(RunDecisionRecord.category, RunDecisionRecord.subject)
+        distinct_subject = distinct_subject.where(RunDecisionRecord.run_id == run_id)
+        if category is not None:
+            distinct_subject = distinct_subject.where(RunDecisionRecord.category == category)
+        statement = select(func.count()).select_from(distinct_subject.distinct().subquery())
+        return int(self.session.scalar(statement) or 0)
+
+    def categories(self, run_id: str) -> list[str]:
+        statement = (
+            select(RunDecisionRecord.category)
+            .where(RunDecisionRecord.run_id == run_id)
+            .distinct()
+            .order_by(RunDecisionRecord.category)
+        )
+        return list(self.session.scalars(statement))
 
 
 class ReviewRepository:

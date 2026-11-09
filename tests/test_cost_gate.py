@@ -24,6 +24,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from apps.api.app import db_models  # noqa: F401
+from apps.api.app.actor import ActorContext
 from apps.api.app.db import Base
 from apps.api.app.db_store import DatabaseStore
 from apps.api.app.main import app
@@ -45,6 +46,14 @@ from packages.tool_kit.registry import ToolRegistry
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = PROJECT_ROOT / "apps" / "web"
+
+#: Route functions take the resolved actor as a parameter; the decision log
+#: records who confirmed a paid provider, so the direct calls need one.
+ACTOR = ActorContext(
+    actor_id="user_test_owner",
+    tenant_id="tenant_default",
+    display_name="Test Owner",
+)
 
 
 def _pipeline_capabilities(pipeline) -> list[str]:
@@ -452,7 +461,7 @@ def test_start_route_returns_the_structured_reservation_refusal(tmp_path) -> Non
     store, run = _store(tmp_path, cost_budget=0.5, name="api-reserve.db")
 
     with pytest.raises(HTTPException) as exc_info:
-        start_run_route(run.run_id, store, None)
+        start_run_route(run.run_id, store, ACTOR, None)
 
     assert exc_info.value.status_code == 400
     detail = exc_info.value.detail
@@ -473,6 +482,7 @@ def test_provider_consent_route_round_trips(tmp_path) -> None:
         run.run_id,
         ProviderConsentRequest(provider="dashscope", note="approved by ops"),
         store,
+        ACTOR,
     )
 
     assert response["accept"] is True
@@ -489,6 +499,7 @@ def test_provider_consent_route_404s_for_an_unknown_run(tmp_path) -> None:
             "run_does_not_exist",
             ProviderConsentRequest(provider="dashscope"),
             store,
+            ACTOR,
         )
     assert exc_info.value.status_code == 404
 

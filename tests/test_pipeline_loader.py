@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from packages.pipeline_kit.loader import PipelineLoader
 
 
@@ -196,11 +198,14 @@ def test_list_pipelines_includes_legacy_and_formal_spokesperson_keys() -> None:
     assert {
         "animated_explainer",
         "avatar_spokesperson",
+        "cinematic",
         "hybrid_story",
         "localization_dub",
+        "podcast_repurpose",
         "screen_demo",
         "source_clip_factory",
         "spokesperson_ad",
+        "talking_head",
     }.issubset(pipeline_keys)
 
 
@@ -215,3 +220,42 @@ def test_pipeline_snapshot_can_round_trip() -> None:
     assert restored.dsl_version == "1.0"
     assert restored.stages[0].stage_key == "intake"
     assert restored.stable_content_hash() == pipeline.stable_content_hash()
+
+
+@pytest.mark.parametrize(
+    ("pipeline_key", "required_capabilities"),
+    [
+        ("talking_head", {"speech_to_text", "subtitle_generation"}),
+        ("podcast_repurpose", {"speech_to_text"}),
+        ("cinematic", {"media_analysis"}),
+    ],
+)
+def test_p1_media_lines_declare_their_selection_contract(
+    pipeline_key: str, required_capabilities: set[str]
+) -> None:
+    """Each P1 line must state the capability its selection criterion depends on.
+
+    Talking head selects by language and must caption; podcast repurpose cannot
+    select at all without a transcript; cinematic selects on mood and keeps
+    grading optional so it degrades instead of blocking.
+    """
+    pipeline = PipelineLoader().get_pipeline(pipeline_key)
+
+    assert pipeline.status == "beta"
+    assert pipeline.dsl_version == "1.0"
+    assert pipeline.stages[0].stage_key == "intake"
+    assert pipeline.stages[-1].stage_key == "publish"
+    assert any(stage.requires_human_review for stage in pipeline.stages)
+    assert required_capabilities.issubset(set(pipeline.required_capabilities))
+    assert pipeline.metadata["strategy_document"].endswith(f"{pipeline_key}.md")
+
+    analysis = next(stage for stage in pipeline.stages if stage.stage_key == "analysis")
+    assert not analysis.requires_human_review
+
+
+def test_cinematic_keeps_grading_optional() -> None:
+    pipeline = PipelineLoader().get_pipeline("cinematic")
+
+    assert "color_grading" in pipeline.optional_capabilities
+    assert "color_grading" not in pipeline.required_capabilities
+    assert "21:9" not in pipeline.supported_aspect_ratios

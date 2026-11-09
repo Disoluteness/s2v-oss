@@ -220,7 +220,7 @@ Register an endpoint, then verify what arrives:
 ```python
 from s2v import Script2VideoClient, verify_webhook_signature, SIGNATURE_HEADER
 
-client = Script2VideoClient(base_url="http://localhost:8080", api_key="s2v_...")
+client = Script2VideoClient(base_url="http://localhost:18080", api_key="s2v_...")
 
 subscription = client.create_webhook_subscription(
     "ops-hook", "https://ops.internal/hooks/s2v", ["run.completed", "stage.waiting_review"],

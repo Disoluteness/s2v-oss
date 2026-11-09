@@ -19,7 +19,7 @@ python3 scripts/s2v.py config --base-url http://<你的服务地址>:18080
 ```
 探活        ok  (script2video-studio-api)
 版本        1.1.0  ·  环境 local
-迁移        20261012_0022  head 20261012_0022  pending=0
+迁移        20261109_0023  head 20261109_0023  pending=0
 ```
 
 `探活 ok` + `pending=0` 就是环境可用。若报「库还不在 head 上」，先在服务器升级 schema，别急着建 run。

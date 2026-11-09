@@ -49,6 +49,12 @@ from apps.api.app.db_models import (
     WebhookDeliveryRecord,
     WebhookSubscriptionRecord,
 )
+from apps.api.app.decision_log import (
+    paid_provider_consent_entry,
+    quality_downgrade_entry,
+    review_decision_entry,
+    tool_selection_entries,
+)
 from apps.api.app.deployment import (
     DEFAULT_MAINTENANCE_MESSAGE,
     DEPLOYMENT_SETTINGS_ID,
@@ -175,6 +181,7 @@ from apps.api.app.models import (
     RunCopyRequest,
     RunCopyResult,
     RunCreate,
+    RunDecisionLog,
     RunStateActionName,
     RunStateActionRequest,
     RunStateActionResult,
@@ -231,6 +238,7 @@ from apps.api.app.repositories import (
     BrandStyleRepository,
     CollectionAddOutcome,
     CollectionImportOutcome,
+    DecisionLogRepository,
     DeploymentSettingsRepository,
     EventRepository,
     ExternalIntegrationOutcome,
@@ -413,6 +421,10 @@ class DatabaseStore:
         self.runs = ProductionRunRepository(session)
         self.artifacts = ArtifactRepository(session)
         self.events = EventRepository(session)
+        # P2: reasoning, not edits. Written from the four places that make a
+        # choice (plan, review, downgrade acknowledgement, paid-provider consent)
+        # and read back through ``GET /api/runs/{run_id}/decision-log``.
+        self.decisions = DecisionLogRepository(session)
         self.assets = AssetRepository(session)
         self.asset_library = AssetCollectionRepository(session)
         self.tool_invocations = ToolInvocationRepository(session)
@@ -3261,6 +3273,8 @@ class DatabaseStore:
         run_id: str,
         *,
         accept_intent_downgrade: bool = False,
+        actor_id: str | None = None,
+        actor_display_name: str | None = None,
     ) -> ProductionRun | None:
         if self.runs.get_run(run_id) is None:
             return None
@@ -3307,6 +3321,8 @@ class DatabaseStore:
             run_id,
             execution_plan_artifact=execution_plan_artifact,
             accepted=accept_intent_downgrade,
+            actor_id=actor_id,
+            actor_display_name=actor_display_name,
         )
 
         self._assert_cost_reservation_allows(
@@ -3483,6 +3499,23 @@ class DatabaseStore:
                 stage=stage,
                 payload=payload,
             )
+            # Re-opening is a verdict on the same stage, so it replaces the
+            # current verdict in the log rather than adding a parallel subject.
+            self.decisions.append(
+                run_id=record.id,
+                tenant_id=record.tenant_id,
+                project_id=record.project_id,
+                entry=review_decision_entry(
+                    stage_key=request_record.stage_key,
+                    decision=payload.decision.value,
+                    review_request_id=review_request_id,
+                    review_decision_id=None,
+                    round_number=request_record.iteration,
+                    comment=payload.comment,
+                    actor_id=payload.actor_user_id,
+                    actor_display_name=payload.actor_display_name,
+                ),
+            )
             self.session.commit()
             return self.get_review_request(review_request_id)  # type: ignore[return-value]
 
@@ -3535,6 +3568,24 @@ class DatabaseStore:
             review_request=review_request_from_record(request_record),
             decision_id=decision_row.decision_id,
             payload=payload,
+        )
+        # P2: a gate verdict is a decision too, and the one humans most often
+        # need to explain later. Recorded before the state machine applies it so
+        # the row exists even if the transition downstream is rejected.
+        self.decisions.append(
+            run_id=record.id,
+            tenant_id=record.tenant_id,
+            project_id=record.project_id,
+            entry=review_decision_entry(
+                stage_key=request_record.stage_key,
+                decision=payload.decision.value,
+                review_request_id=review_request_id,
+                review_decision_id=decision_row.decision_id,
+                round_number=request_record.iteration,
+                comment=payload.comment,
+                actor_id=payload.actor_user_id,
+                actor_display_name=payload.actor_display_name,
+            ),
         )
 
         if payload.decision in {
@@ -4852,6 +4903,20 @@ class DatabaseStore:
                 "decision_count": len(execution_plan["decision_log"]),
             },
         )
+        # P2: the plan's decision_log is the reasoning the selector produced.
+        # Persisting it here means the reasoning survives the artifact being
+        # superseded by a later plan, which is exactly when an audit starts.
+        record = self._get_run_record(run_id)
+        if record is not None:
+            self.decisions.append_many(
+                run_id=record.id,
+                tenant_id=record.tenant_id,
+                project_id=record.project_id,
+                entries=tool_selection_entries(
+                    execution_plan["decision_log"],
+                    artifact_id=artifact.artifact_id,
+                ),
+            )
         self.session.commit()
         return artifact
 
@@ -5481,6 +5546,46 @@ class DatabaseStore:
         if self.runs.get_run(run_id) is None:
             return None
         return self.assets.list_assets(run_id)
+
+    def list_run_decisions(
+        self,
+        run_id: str,
+        *,
+        category: str | None = None,
+        include_history: bool = False,
+        limit: int = 200,
+    ) -> RunDecisionLog | None:
+        """The decision log for one run.
+
+        Default view is "what the run currently believes": one row per
+        ``(category, subject)``, which is what a page wants to render.
+        ``include_history=True`` returns every append, in sequence order, which
+        is what an audit wants. ``categories`` is always computed over the whole
+        run so the filter chips stay complete even when one category is selected.
+        """
+
+        if self.runs.get_run(run_id) is None:
+            return None
+        entries = self.decisions.list_decisions(
+            run_id,
+            category=category,
+            include_history=include_history,
+            limit=limit,
+        )
+        available = self.decisions.total(
+            run_id,
+            category=category,
+            include_history=include_history,
+        )
+        return RunDecisionLog(
+            run_id=run_id,
+            count=len(entries),
+            total=available,
+            truncated=available > len(entries),
+            categories=self.decisions.categories(run_id),
+            history_included=include_history,
+            entries=entries,
+        )
 
     # ------------------------------------------------------------------ #
     # asset library (V6.4)
@@ -9444,6 +9549,8 @@ class DatabaseStore:
         *,
         execution_plan_artifact: Artifact,
         accepted: bool,
+        actor_id: str | None = None,
+        actor_display_name: str | None = None,
     ) -> None:
         """Refuse a silent downgrade of the quality the run declared (T75).
 
@@ -9503,6 +9610,22 @@ class DatabaseStore:
                 "execution_policy": plan.get("execution_policy"),
                 "intent_downgrades": downgrades,
             },
+        )
+        # P2: who accepted running below the declared quality, and what exactly
+        # they gave up. This is the one gate where silence looks like success —
+        # the run proceeds either way — so the record is the only proof the
+        # question was ever asked.
+        self.decisions.append(
+            run_id=record.id,
+            tenant_id=record.tenant_id,
+            project_id=record.project_id,
+            entry=quality_downgrade_entry(
+                downgrades=downgrades,
+                quality_mode=(plan.get("run_input") or {}).get("quality_mode"),
+                actor_id=actor_id,
+                actor_display_name=actor_display_name,
+                artifact_id=execution_plan_artifact.artifact_id,
+            ),
         )
 
     def _assert_cost_reservation_allows(
@@ -9665,6 +9788,8 @@ class DatabaseStore:
         provider: str,
         accept: bool = True,
         note: str | None = None,
+        actor_id: str | None = None,
+        actor_display_name: str | None = None,
     ) -> ProductionRun | None:
         """Record (or retract) a paid-provider confirmation for a run."""
         record = self._get_run_record(run_id)
@@ -9697,6 +9822,20 @@ class DatabaseStore:
                 else f"Paid provider {provider} confirmation revoked."
             ),
             payload={"provider": provider, "note": note},
+        )
+        # P2: spending money is a decision, and "who said yes to this provider"
+        # is asked months later during reconciliation.
+        self.decisions.append(
+            run_id=record.id,
+            tenant_id=record.tenant_id,
+            project_id=record.project_id,
+            entry=paid_provider_consent_entry(
+                provider=provider,
+                accepted=accept,
+                note=note,
+                actor_id=actor_id,
+                actor_display_name=actor_display_name,
+            ),
         )
         self.session.commit()
         return self.runs.get_run(run_id)

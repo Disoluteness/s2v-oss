@@ -113,6 +113,7 @@ from apps.api.app.models import (
     RunCopyRequest,
     RunCopyResult,
     RunCreate,
+    RunDecisionLog,
     RunStateActionRequest,
     RunStateActionResult,
     RunStatus,
@@ -1794,6 +1795,32 @@ def list_tool_invocations(run_id: str, store: StoreDep) -> list[dict]:
     return [invocation.model_dump() for invocation in invocations]
 
 
+@router.get("/runs/{run_id}/decision-log", response_model=RunDecisionLog)
+def get_run_decision_log(
+    run_id: str,
+    store: StoreDep,
+    category: str | None = None,
+    include_history: bool = False,
+    limit: int = 200,
+) -> RunDecisionLog:
+    """Why the run made each choice, and what it turned down.
+
+    Read-only by design: a decision log that can be edited is not evidence. The
+    default view is one row per ``(category, subject)`` — "what the run currently
+    believes" — and ``include_history=true`` returns every append in order.
+    """
+
+    log = store.list_run_decisions(
+        run_id,
+        category=category,
+        include_history=include_history,
+        limit=limit,
+    )
+    if log is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return log
+
+
 @router.get("/runs/{run_id}/usage", response_model=UsageSummary)
 def get_usage_summary(run_id: str, store: StoreDep) -> UsageSummary:
     summary = store.get_usage_summary(run_id)
@@ -2115,12 +2142,15 @@ def record_event(run_id: str, payload: EventCreate, store: StoreDep) -> dict:
 def start_run(
     run_id: str,
     store: StoreDep,
+    actor: ActorDep,
     payload: StartRunRequest | None = None,
 ) -> dict:
     try:
         run = store.start_run(
             run_id,
             accept_intent_downgrade=bool(payload and payload.accept_intent_downgrade),
+            actor_id=actor.actor_id,
+            actor_display_name=actor.display_name,
         )
     except RunGateError as exc:
         raise _run_gate_http_error(exc) from exc
@@ -2136,6 +2166,7 @@ def confirm_paid_provider(
     run_id: str,
     payload: ProviderConsentRequest,
     store: StoreDep,
+    actor: ActorDep,
 ) -> dict:
     """Confirm (or retract) first-use consent for a paid provider on this run (T76)."""
 
@@ -2144,6 +2175,8 @@ def confirm_paid_provider(
         provider=payload.provider,
         accept=payload.accept,
         note=payload.note,
+        actor_id=actor.actor_id,
+        actor_display_name=actor.display_name,
     )
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")

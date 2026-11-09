@@ -7,8 +7,37 @@
 `GET /openapi.json` 的 `info.version` 与 `GET /api/deployment` 的 `app_version`。
 两个 SDK（`s2v` / `s2v-client`）**独立演进**，各自的版本不出现在这里。
 
+仓库的**发布版本**（`1.0.x`，对应 git tag）与**服务端 API 版本**（`1.1.0`，只在接口形状
+变化时前进）是两条轴，所以发布日期更新的 `1.0.1` 排在 `1.1.0` 之上。
+
 从 `1.0.0` 起，稳定面的兼容规则由 `docs/API_STABILITY.md` 约束；本文件只记录
 「已经发生的变更」，不预测。
+
+## [1.0.1] - 2026-11-09
+
+### Added
+
+- **三条素材剪辑流水线**（`talking_head` / `podcast_repurpose` / `cinematic`）：
+  - 与 `source_clip_factory` 共用 ingest → analysis → clip_selection → edit → export 内核，差别在**选片判据**：真人出镜看「观点完整 + 开头钩子 + 口误密度」，播客音频看「片段能否独立成立 + 金句密度」，情绪剪辑看「情绪契合 + 画面强度 + 节拍贴合」。
+  - `podcast_repurpose` 把转写列为**必需**能力：没有真实转写就选不出有意义的片段，占位转写会让该阶段失败，而不是产出空剪辑。
+  - `cinematic` 把调色列为**可选**能力，缺失时计划记录平色、不假装已调色；`final_review` 的审核项包含「声称运动为主、实际多为静态图」的对照。
+  - 目录从 7 条变为 10 条（1 条 production、1 条 draft、8 条 beta）。不新增表、不新增迁移、不新增工具目录条目，已有 7 条流水线的定义未动。
+  - 后续批次（渲染前承诺校验、选择器可解释化等）见 `docs/CAPABILITY_GAP_PLAN.md`。
+- **决策审计日志**（`GET /api/runs/{run_id}/decision-log`，新表 `run_decisions`，migration `20261109_0023`）：
+  - 记录四类选择：工具选择（系统）、审核裁决（人）、质量降级接受（人）、首次付费确认（人）。每条带 `chosen` / `candidates` / `confidence` / `rationale`，即「选了什么、放弃了什么、差距多大、为什么」。
+  - 被跳过与被阻塞的能力同样落库：`blocked` / `skip_optional` 的条目才是「为什么这条片子没有背景音乐」的答案。
+  - `confidence` 是**分数差距**（`score_margin` / `uncontested`），不是概率；人工裁决一律为空——审核人给的是结论，不是偏好排序。
+  - 读语义：默认按 `(category, subject)` 去重（当前相信什么），`include_history=true` 返回全部追加（中途改过什么主意），`category=` 只收窄条目、不影响分类清单；`count` / `total` / `truncated` 三个字段让被 `limit` 截断的读取明确说自己被截断。只有一个 `GET`，因为能被编辑的记录不是证据。
+  - 新增表 1 张、迁移 1 个（upgrade → downgrade → upgrade 往返已验证）；既有端点、字段、错误码一字未动，OpenAPI 从 124 path / 156 operation 变为 125 / 157。
+- **供应商密钥可在页面上维护**（`/settings`）：
+  - 新增一个 HTML 页面，把已有的 `/api/provider-credentials` 列表、新增、更新、启停、可用性检查、加密托管全部搬到浏览器里，不必再手写 curl。
+  - 页面照抄工具目录里的变量名（`DASHSCOPE_API_KEY` / `ELEVENLABS_API_KEY` / `KLING_ACCESS_KEY`），避免「名字填错但不报错」这一类静默故障。
+  - **不改任何 JSON 契约**：页面是 `include_in_schema=False` 的 HTML 路由（与 `/dashboard`、`/team` 同类），端点、字段、错误码一字未动。
+  - 这次改动暴露了一条本来就成立、但过去只能从代码读出来的事实：库内凭据**优先于** `.env`，且 api 与 worker 都是每请求 / 每轮重建 store，所以**保存即生效，不需要重启**。停用一条凭据后，下一轮工具目录立刻把它降级为 `unavailable`。
+
+### Fixed
+
+- **文档：示例地址不再自相矛盾**。README（中英双语）里的每一条请求示例统一为 compose 暴露的宿主机端口 `http://localhost:18080`，并在首次出现处标明「`make api` 直接在本机跑仍是 `8080`」；同时补上 CLI 的连接地址解析顺序（`--base-url` > `S2V_BASE_URL` > 本地配置，`s2v config set base-url` 一次写入）。此前示例混用 `8080`，照抄连不上 compose 起的服务。`sdk/*/README.md` 与 `docs/VERSIONS.md` 同步。
 
 ## [1.1.0] - 2026-10-13
 

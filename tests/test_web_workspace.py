@@ -1,6 +1,12 @@
 import re
 
-from apps.api.app.main import app, dashboard_html_path, run_board_html_path, workspace_html_path
+from apps.api.app.main import (
+    app,
+    dashboard_html_path,
+    run_board_html_path,
+    settings_html_path,
+    workspace_html_path,
+)
 from packages.pipeline_kit.loader import PipelineLoader
 
 
@@ -9,7 +15,7 @@ def test_workspace_route_is_registered() -> None:
     # (they return HTML, not JSON — see tests/test_openapi_contract.py), so the
     # route table is the right place to assert them.
     registered = {getattr(route, "path", None) for route in app.routes}
-    assert {"/workspace", "/dashboard", "/run-board"} <= registered
+    assert {"/workspace", "/dashboard", "/run-board", "/settings"} <= registered
 
     schema = app.openapi()
 
@@ -301,6 +307,39 @@ def test_run_board_html_targets_board_api() -> None:
     assert "renderCostLog" in html
 
 
+def test_run_board_html_reads_the_persisted_decision_log() -> None:
+    """P2: the 决策日志 panel shows reasoning, not just a list of tool picks."""
+
+    html = run_board_html_path().read_text(encoding="utf-8")
+
+    # The panel reads the persisted log — with history — instead of only the copy
+    # the execution plan embeds in the board payload.
+    assert "/decision-log?include_history=true" in html
+    for element_id in (
+        'id="decisionCategory"',
+        'id="decisionHint"',
+        'id="decisionCount"',
+        'id="decisionLog"',
+    ):
+        assert element_id in html, f"missing decision element: {element_id}"
+    for label in ("工具选择", "人工审核", "质量降级确认", "付费供应商确认"):
+        assert label in html, f"missing decision category label: {label}"
+    assert "当前结论" in html and "历史共" in html
+    # The confidence column states a margin, never a probability — "把握度 92%"
+    # would read as the system being sure, which it is not claiming.
+    assert "领先次优" in html
+    assert "无竞争者" in html
+    assert "把握度" not in html
+    # A truncated read must announce itself in the panel, not just in the payload.
+    assert "较早的决策未显示" in html
+    # A failed request must degrade to the plan artifact, not blank the panel.
+    assert "renderPlanDecisionFallback" in html
+    assert "决策日志接口不可用" in html
+    assert "该类别暂无决策记录" in html
+    # The panel keeps its place between the input gaps and the cost log.
+    assert html.index("输入缺口与修复动作") < html.index("决策日志") < html.index("成本日志")
+
+
 def test_run_board_html_exposes_the_review_block() -> None:
     html = run_board_html_path().read_text(encoding="utf-8")
 
@@ -437,3 +476,39 @@ def test_review_focus_label_falls_back_to_the_raw_token() -> None:
         html = path_getter().read_text(encoding="utf-8")
         assert "reviewFocusLabel" in html
         assert _extract_map_keys(html, anchor)
+
+
+def test_settings_html_maintains_provider_credentials() -> None:
+    """The operator page has to reach the credential API, not just look like it.
+
+    A settings page that only renders a form is worse than none: the operator
+    believes the key was saved. These assertions pin the four calls the page
+    actually makes onto the copy that explains what they do.
+    """
+    html = settings_html_path().read_text(encoding="utf-8")
+
+    # Every operation the backend exposes is reachable from this one page.
+    assert "/api/provider-credentials" in html
+    assert "provider-credentials/${id}/check" in html
+    assert "provider-credentials/${id}/rotate" in html
+    assert 'method: "PATCH"' in html
+    assert 'method: "POST"' in html
+    assert "secret_values" in html
+
+    # The precedence rule is the whole reason the page exists; it must be said.
+    assert "优先于" in html and ".env" in html
+    assert "不需要重启" in html
+
+    # The variable names come from the tool catalog — a typo here is silent.
+    for env_var in ("DASHSCOPE_API_KEY", "ELEVENLABS_API_KEY", "KLING_ACCESS_KEY"):
+        assert env_var in html, f"settings page never mentions {env_var}"
+
+    # Secrets are shown masked, and the operator can revoke them without a curl.
+    assert "secret_preview" in html
+    assert "停用" in html and "启用" in html
+
+
+def test_dashboard_links_to_the_settings_page() -> None:
+    html = dashboard_html_path().read_text(encoding="utf-8")
+    assert 'id="openSettingsButton"' in html
+    assert '"/settings"' in html

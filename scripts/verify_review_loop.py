@@ -3226,8 +3226,8 @@ def verify_deployment(base_url: str) -> None:
     )
     migration = posture.get("migration") or {}
     check(
-        "迁移自检：head=20261012_0022 且当前库已在 head（pending 为空）",
-        migration.get("head") == "20261012_0022"
+        "迁移自检：head=20261109_0023 且当前库已在 head（pending 为空）",
+        migration.get("head") == "20261109_0023"
         and migration.get("up_to_date") is True
         and migration.get("pending") == [],
         {"head": migration.get("head"), "current": migration.get("current")},
@@ -3460,8 +3460,8 @@ def verify_release(base_url: str) -> None:
         if method.lower() in {"get", "post", "patch", "put", "delete"}
     )
     check(
-        "OpenAPI 文档化端点不少于 124 path / 156 operation",
-        len(paths) >= 124 and operations >= 156,
+        "OpenAPI 文档化端点不少于 125 path / 157 operation",
+        len(paths) >= 125 and operations >= 157,
         {"paths": len(paths), "operations": operations},
     )
 
@@ -3505,8 +3505,8 @@ def verify_release(base_url: str) -> None:
     pipelines = call(base_url, "GET", "/api/pipelines")
     keys = [entry.get("pipeline_key") for entry in pipelines]
     check(
-        "pipeline 目录恰好 7 条且 key 唯一",
-        len(pipelines) == 7 and len(set(keys)) == len(keys),
+        "pipeline 目录恰好 10 条且 key 唯一",
+        len(pipelines) == 10 and len(set(keys)) == len(keys),
         keys,
     )
     stable = [entry for entry in pipelines if entry.get("status") != "draft"]
@@ -3537,6 +3537,190 @@ def verify_release(base_url: str) -> None:
         "三个目录端点对未入座的外部身份仍可读（免凭据是它们的意义）",
         not unreadable,
         unreadable,
+    )
+
+
+def verify_decision_log(base_url: str) -> None:
+    """P2: the run records *why*, and the record is read-only.
+
+    ``event_logs`` says what happened and ``audit_logs`` says who changed what.
+    Neither can answer "why this tool and not the other one", which is the
+    question actually asked when a run produces something unexpected. The three
+    things worth checking against a live deployment are therefore: the reasoning
+    lands with the choice, the alternatives travel with it, and nothing in the
+    surface lets you edit the record afterwards.
+    """
+    section("26. 决策审计日志（P2）：为什么选它 / 备选 / 只读")
+    project = call(
+        base_url,
+        "POST",
+        "/api/projects",
+        {"title": f"决策日志验证 {datetime.now(UTC):%H:%M:%S}"},
+    )
+    run = call(
+        base_url,
+        "POST",
+        f"/api/projects/{project['project_id']}/runs",
+        {
+            "pipeline_key": "avatar_spokesperson",
+            "raw_script": RAW_SCRIPT,
+            "brand_name": "部署验证品牌",
+            "product_name": "部署验证产品",
+        },
+    )
+    run_id = run["run_id"]
+
+    # --- empty is a valid answer for a run that has planned nothing yet -----
+    empty = call(base_url, "GET", f"/api/runs/{run_id}/decision-log")
+    check(
+        "未做任何决策的 run 返回空日志而不是 404",
+        empty.get("count") == 0 and empty.get("entries") == [],
+        empty.get("count"),
+    )
+
+    # --- planning writes one row per capability ----------------------------
+    call(base_url, "POST", f"/api/runs/{run_id}/execution-plan")
+    log = call(base_url, "GET", f"/api/runs/{run_id}/decision-log")
+    entries = log.get("entries") or []
+    check(
+        "执行计划把每个能力的取舍都写进日志",
+        log.get("count", 0) > 0 and "tool_selection" in (log.get("categories") or []),
+        {"count": log.get("count"), "categories": log.get("categories")},
+    )
+    check(
+        "日志条目的 subject 不重复（当前视图一题一行）",
+        len({entry.get("subject") for entry in entries}) == len(entries),
+        len(entries),
+    )
+    picked = [entry for entry in entries if (entry.get("chosen") or {}).get("tool_key")]
+    check("选中的决策带工具与理由", bool(picked) and all(entry.get("rationale") for entry in picked), len(picked))
+    check(
+        "选中的决策带备选方案（只有赢家不算可审计）",
+        bool(picked) and all(entry.get("candidates") for entry in picked),
+        [len(entry.get("candidates") or []) for entry in picked][:5],
+    )
+    with_candidates = [entry for entry in picked if entry.get("confidence") is not None]
+    check(
+        "置信度是拉开差距的度量，落在 0..1 且写明依据",
+        bool(with_candidates)
+        and all(0.0 <= entry["confidence"] <= 1.0 for entry in with_candidates)
+        and all(
+            entry.get("confidence_basis") in {"score_margin", "uncontested"}
+            for entry in with_candidates
+        ),
+        len(with_candidates),
+    )
+    skipped = [entry for entry in entries if entry.get("decision") in {"blocked", "skip_optional"}]
+    check(
+        "被跳过/阻塞的能力也有记录（否则「为什么没有背景音乐」无法回答）",
+        not skipped or all(entry.get("rationale") for entry in skipped),
+        [entry.get("subject") for entry in skipped],
+    )
+    check(
+        "机器决策标记 actor_type=system 且置信度留空于不可度量处",
+        all(entry.get("actor_type") == "system" for entry in entries)
+        and all(entry.get("confidence") is None for entry in skipped),
+        sorted({entry.get("actor_type") for entry in entries}),
+    )
+    check(
+        "决策指向产生它的产物（可从日志回溯到计划）",
+        all(entry.get("source_artifact_id") for entry in picked),
+        [entry.get("source_artifact_id") for entry in picked][:3],
+    )
+
+    # --- a human verdict becomes a decision too ----------------------------
+    call(base_url, "POST", f"/api/runs/{run_id}/start", {})
+    requests = call(base_url, "GET", f"/api/runs/{run_id}/review-requests?status=open")
+    if requests:
+        request_id = requests[0]["review_request_id"]
+        call(
+            base_url,
+            "POST",
+            f"/api/review-requests/{request_id}/decisions",
+            {
+                "decision": "approve",
+                "comment": "决策日志验证：通过。",
+                "actor_user_id": "user_deploy_check",
+                "actor_display_name": "部署核对",
+            },
+        )
+        human = call(
+            base_url,
+            "GET",
+            f"/api/runs/{run_id}/decision-log?category=review_decision",
+        )
+        human_entries = human.get("entries") or []
+        check(
+            "人工裁决也落进同一本账",
+            len(human_entries) == 1 and human_entries[0].get("decision") == "approve",
+            len(human_entries),
+        )
+        check(
+            "裁决记录审核人身份与理由",
+            bool(human_entries)
+            and human_entries[0].get("actor_id") == "user_deploy_check"
+            and human_entries[0].get("rationale") == "决策日志验证：通过。",
+            human_entries[0].get("actor_id") if human_entries else None,
+        )
+        check(
+            "人类裁决不编造置信度与备选（没给他们比过的东西）",
+            bool(human_entries)
+            and human_entries[0].get("confidence") is None
+            and human_entries[0].get("candidates") == [],
+            human_entries[0].get("confidence") if human_entries else None,
+        )
+        # The category list is computed over the whole log, so a filter narrows
+        # the entries without narrowing the chips the UI draws from it.
+        unfiltered = call(base_url, "GET", f"/api/runs/{run_id}/decision-log")
+        check(
+            "分类过滤只收窄条目，不改变分类清单（否则筛选片会被自己筛掉）",
+            human.get("categories") == unfiltered.get("categories")
+            and all(entry.get("category") == "review_decision" for entry in human_entries),
+            human.get("categories"),
+        )
+    else:
+        check("本环境未开出审核请求（跳过人工裁决断言）", True, "no open review request")
+
+    history = call(base_url, "GET", f"/api/runs/{run_id}/decision-log?include_history=true")
+    check(
+        "历史视图包含全部分类且条数不少于当前视图",
+        history.get("history_included") is True
+        and history.get("count", 0) >= log.get("count", 0),
+        {"current": log.get("count"), "history": history.get("count")},
+    )
+    check(
+        "历史视图按 sequence 升序（事件顺序即审计顺序）",
+        [entry.get("sequence") for entry in history.get("entries") or []]
+        == sorted(entry.get("sequence") for entry in history.get("entries") or []),
+        len(history.get("entries") or []),
+    )
+    cut = call(base_url, "GET", f"/api/runs/{run_id}/decision-log?limit=1")
+    check(
+        "被 limit 截断时如实标记（沉默的截断会被读成完整）",
+        cut.get("count") == 1
+        and cut.get("truncated") is True
+        and cut.get("total", 0) > 1,
+        {"count": cut.get("count"), "total": cut.get("total"), "truncated": cut.get("truncated")},
+    )
+
+    expect_error(
+        base_url,
+        "GET",
+        "/api/runs/run_does_not_exist/decision-log",
+        None,
+        status=404,
+        code="not_found",
+    )
+
+    # --- the record is append-only because nothing can reach it ------------
+    spec = call(base_url, "GET", "/openapi.json")
+    methods = sorted(
+        method.lower() for method in (spec.get("paths") or {}).get("/api/runs/{run_id}/decision-log", {})
+    )
+    check(
+        "决策日志只有读取方法（能改的记录不是证据）",
+        methods == ["get"],
+        methods,
     )
 
 
@@ -3582,6 +3766,7 @@ def main() -> int:
         verify_security_hardening(base_url)
         verify_deployment(base_url)
         verify_release(base_url)
+        verify_decision_log(base_url)
 
         print("\n=== 可直接在浏览器打开的地址 ===")
         print(f"  {base_url}/dashboard                                  （审核收件箱）")

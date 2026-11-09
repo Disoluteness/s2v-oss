@@ -565,6 +565,7 @@
             <button id="openWorkspaceButton" class="subtle" type="button">打开工作台</button>
             <button id="openAssetLibraryButton" class="subtle" type="button">打开资产库</button>
             <button id="openTeamButton" class="subtle" type="button">团队与权限</button>
+            <button id="openSettingsButton" class="subtle" type="button">供应商密钥</button>
           </div>
         </header>
 
@@ -1185,6 +1186,9 @@
       });
       $("openTeamButton").addEventListener("click", () => {
         window.location.href = "/team";
+      });
+      $("openSettingsButton").addEventListener("click", () => {
+        window.location.href = "/settings";
       });
       $("statusFilter").addEventListener("change", loadDashboard);
       $("searchInput").addEventListener("input", debounce(loadDashboard, 300));

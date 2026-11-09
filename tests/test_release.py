@@ -21,6 +21,7 @@ The same assertions are repeated against a running instance by gate section 25
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -82,8 +83,17 @@ def test_changelog_records_the_freeze_newest_first() -> None:
     # must still precede every older one.
     dated = [line for line in releases if not line.startswith("## [Unreleased]")]
     assert dated, "the changelog must list at least one dated release"
-    assert dated[0].startswith(f"## [{FROZEN_VERSION}]"), (
+    # Two axes share this file: the release version (1.0.x, what someone clones)
+    # and the contract version (1.1.0, what a client talks to). A higher release
+    # number can be older than the contract it ships, so ordering by number would
+    # forbid the correct order. Dates are the one scale both axes share.
+    days = re.findall(r"^## \[[^\]]+\] - (\d{4}-\d{2}-\d{2})$", text, flags=re.MULTILINE)
+    assert len(days) >= 3, "the recent releases must carry dates"
+    assert days == sorted(days, reverse=True), (
         "newest release first is the whole point of a changelog"
+    )
+    assert re.search(rf"^## \[{re.escape(FROZEN_VERSION)}\] - ", text, flags=re.MULTILINE), (
+        "the frozen contract version must keep its own section"
     )
     unreleased = [line for line in releases if line.startswith("## [Unreleased]")]
     if unreleased:
@@ -158,7 +168,7 @@ def test_pipeline_catalogue_meets_the_release_bar() -> None:
     way there.
     """
     pipelines = PipelineLoader().list_pipelines()
-    assert len(pipelines) == 7
+    assert len(pipelines) == 10
 
     keys = [pipeline.pipeline_key for pipeline in pipelines]
     assert len(set(keys)) == len(keys)

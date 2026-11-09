@@ -1,6 +1,6 @@
 # 对外接入指南：别的服务怎么调这个服务
 
-状态：随 **1.1.0** 编写；端点清单由运行中的应用自身导出（`GET /openapi.json`，124 path / 156 operation），
+状态：随 **1.1.0** 编写；端点清单由运行中的应用自身导出（`GET /openapi.json`，125 path / 157 operation），
 与 `tests/test_openapi_contract.py` 钉住的契约同源。
 
 这份文档回答一个问题：**另一个服务要调本服务，该怎么接、按什么顺序调。**

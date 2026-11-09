@@ -75,7 +75,7 @@ After the first rollout, verify with the deployment posture endpoint:
 
 ```bash
 curl -fsS https://studio.example.com/api/deployment | jq '.migration'
-# {"head":"20261012_0022","current":"20261012_0022","pending":[],"up_to_date":true}
+# {"head":"20261109_0023","current":"20261109_0023","pending":[],"up_to_date":true}
 ```
 
 `up_to_date: false` with a non-empty `pending` means the code shipped ahead of the

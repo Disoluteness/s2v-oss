@@ -398,6 +398,52 @@ class EventLogRecord(Base, TimestampMixin):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
+class RunDecisionRecord(Base, TimestampMixin):
+    """Why a choice was made, as opposed to who changed what.
+
+    ``audit_logs`` answers "who touched this"; this table answers "why this tool
+    and not the other one". One row is one decision with the alternatives that
+    were considered, so a reviewer can audit the reasoning after the fact
+    instead of re-running the selector and hoping it agrees.
+
+    Rows are append-only — re-planning a run adds rows rather than rewriting
+    them — and the current value of a ``(category, subject)`` pair is the
+    highest ``sequence`` row. That is the same convention ``review_decisions``
+    already uses, and it keeps the history available for "what changed and when".
+    """
+
+    __tablename__ = "run_decisions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True)
+    project_id: Mapped[str] = mapped_column(String(64), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("production_runs.id"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    # ``tool_selection`` / ``review_decision`` / ``quality_downgrade`` /
+    # ``paid_provider_consent``. Free text rather than an enum column: a new
+    # write point should not need a migration.
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    subject: Mapped[str] = mapped_column(String(255))
+    stage_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    decision: Mapped[str] = mapped_column(String(64), index=True)
+    # ``chosen`` is the winner in a stable shape ({tool_key, provider, label}),
+    # ``candidates`` the runners-up with their scores. Both are JSON because the
+    # shape legitimately differs per category and querying inside them is not a
+    # requirement — the endpoint filters by category/subject, not by payload.
+    chosen: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    candidates: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    # Nullable on purpose: a human decision has no score, and inventing one would
+    # make the column look more authoritative than the data behind it.
+    # ``confidence_basis`` says which measurement produced the number.
+    confidence: Mapped[float | None] = mapped_column(Numeric(4, 3), nullable=True)
+    confidence_basis: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_type: Mapped[str] = mapped_column(String(32), default="system")
+    actor_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    actor_display_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    source_artifact_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
 class ReviewRequestRecord(Base, TimestampMixin):
     """A single gate review item bound to one stage execution and one artifact scope."""
 

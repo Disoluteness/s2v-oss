@@ -22,7 +22,7 @@
 ## 核心特性
 
 **流水线与产物**
-- 7 条流水线：正式版 `avatar_spokesperson`（数字人口播，品牌广告 / 知识口播 / 商品种草），兼容键 `spokesperson_ad`，以及 5 条 beta：`animated_explainer`、`source_clip_factory`、`screen_demo`、`hybrid_story`、`localization_dub`
+- 10 条流水线：正式版 `avatar_spokesperson`（数字人口播，品牌广告 / 知识口播 / 商品种草），兼容键 `spokesperson_ad`（draft），以及 8 条 beta：`animated_explainer`、`source_clip_factory`、`screen_demo`、`hybrid_story`、`localization_dub`，和素材剪辑三条 —— `talking_head`（真人出镜素材）、`podcast_repurpose`（长音频）、`cinematic`（情绪剪辑 / 预告）
 - Pipeline DSL v1：流水线定义随 run 落快照，事后改文件不影响历史 run
 - 产物 Schema Registry：`production_plan`、`spoken_script`、`shot_list`、`preflight_report`、`execution_plan`、`composition_graph` 等产物写入前校验，携带 `producer` / `lineage` / `derived_from` 血缘
 - Run 状态机：`pause` / `resume` / `cancel` / `rerun_stage` / `rerun_artifact` / `skip_optional_stage`，重跑允许从 `completed` 发起，下游已通过的关口按轮次重开
@@ -108,7 +108,7 @@ cp .env.example .env
 make api
 ```
 
-打开：
+打开（`make api` 本机监听 `8080`；下面 compose 起的服务是宿主机 `18080`）：
 
 ```text
 http://localhost:8080/api/health
@@ -124,7 +124,7 @@ docker compose up --build
 docker compose exec api alembic upgrade head
 ```
 
-Compose 网络内 API 连 `mysql:3306`；宿主机暴露 MySQL `3307`、API `18080`（避开常见端口冲突），Redis 与 MinIO 不出网络。Worker 启动即自动处理队列任务；调试用：
+Compose 网络内 API 连 `mysql:3306`；宿主机暴露 MySQL `3307`、API `18080`（避开常见端口冲突），Redis 与 MinIO 不出网络。下文所有请求示例都按 compose 的 `http://localhost:18080` 写；若你用上面的 `make api` 直接在本机跑，把端口换回 `8080`。Worker 启动即自动处理队列任务；调试用：
 
 ```bash
 docker compose exec worker python -m apps.worker.background_jobs --once
@@ -136,12 +136,12 @@ docker compose exec worker python -m apps.worker.background_jobs --once
 
 ```bash
 ### 1. 建项目
-curl -X POST http://localhost:8080/api/projects \
+curl -X POST http://localhost:18080/api/projects \
   -H "Content-Type: application/json" \
   -d '{"title":"秋天奶茶广告"}'
 
 ### 2. 在项目下建 run
-curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
+curl -X POST http://localhost:18080/api/projects/<project_id>/runs \
   -H "Content-Type: application/json" \
   -d '{
     "pipeline_key":"avatar_spokesperson",
@@ -153,19 +153,19 @@ curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
   }'
 
 ### 3. 预检 → 生成可审计执行计划 → 启动
-curl -X POST http://localhost:8080/api/runs/<run_id>/preflight
-curl -X POST http://localhost:8080/api/runs/<run_id>/execution-plan
-curl -X POST http://localhost:8080/api/runs/<run_id>/start
+curl -X POST http://localhost:18080/api/runs/<run_id>/preflight
+curl -X POST http://localhost:18080/api/runs/<run_id>/execution-plan
+curl -X POST http://localhost:18080/api/runs/<run_id>/start
 
 ### 4. 审核循环：run 停在 waiting_review 时，找到打开的关口并批准
-curl "http://localhost:8080/api/runs/<run_id>/review-requests?status=open"
+curl "http://localhost:18080/api/runs/<run_id>/review-requests?status=open"
 
-curl -X POST http://localhost:8080/api/review-requests/<request_id>/decisions \
+curl -X POST http://localhost:18080/api/review-requests/<request_id>/decisions \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 
 ### 或一键过当前阶段（等价，基于同一审核内核）
-curl -X POST http://localhost:8080/api/runs/<run_id>/stages/<stage_key>/review \
+curl -X POST http://localhost:18080/api/runs/<run_id>/stages/<stage_key>/review \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 ```
@@ -178,7 +178,7 @@ curl -X POST http://localhost:8080/api/runs/<run_id>/stages/<stage_key>/review \
 不想马上接真实供应商？MVP 示例端点用本地确定性 FFmpeg 媒体走完整脚本到 MP4 链路（默认 `local_preview` 模式）：
 
 ```bash
-curl -X POST http://localhost:8080/api/mvp/sample-runs \
+curl -X POST http://localhost:18080/api/mvp/sample-runs \
   -H "Content-Type: application/json" \
   -d '{
     "title":"秋天奶茶示例",
@@ -200,7 +200,7 @@ pip install ./sdk/python   # 提供 `import s2v` 与 `s2v` 命令
 ```python
 from s2v import Script2VideoClient
 
-client = Script2VideoClient(base_url="http://localhost:8080", api_key="s2v_...")
+client = Script2VideoClient(base_url="http://localhost:18080", api_key="s2v_...")
 video = client.script_to_video("秋天第一杯奶茶，还没人给你点？", project_title="上新")
 print(video.download_url)
 ```
@@ -216,6 +216,13 @@ s2v video download <run_id> -o final.mp4
 
 退出码是契约的一部分：`0` 成功、`1` 失败、`2` 用法错误、`3` 等待超时、`4` run 以 `failed` 收场。
 
+CLI 必须知道服务地址与 key：`--base-url` / `--api-key` 优先，其次 `S2V_BASE_URL` / `S2V_API_KEY`，再次本地配置文件。写进配置一次即可（地址取上面 Quick Start 里 compose 暴露的端口）：
+
+```bash
+s2v config set base-url http://localhost:18080
+s2v config set api-key s2v_...
+```
+
 ## 数字人链路要点
 
 适配器 `dashscope_avatar_video`，异步生命周期：提交 → 轮询 → 归档为资产 → FFmpeg 合成。
@@ -228,7 +235,7 @@ s2v video download <run_id> -o final.mp4
 从已有资产提交（平台代签临时链接）：
 
 ```bash
-curl -X POST http://localhost:8080/api/runs/<run_id>/avatar-tasks/from-assets \
+curl -X POST http://localhost:18080/api/runs/<run_id>/avatar-tasks/from-assets \
   -H "Content-Type: application/json" \
   -d '{"person_image_asset_id":"<asset_id>","audio_asset_id":"<asset_id>"}'
 ```
@@ -236,7 +243,7 @@ curl -X POST http://localhost:8080/api/runs/<run_id>/avatar-tasks/from-assets \
 非阻塞执行用后台作业（Worker 自动提交 / 轮询 / 归档 / 合成）：
 
 ```bash
-curl -X POST http://localhost:8080/api/runs/<run_id>/jobs/avatar-from-assets \
+curl -X POST http://localhost:18080/api/runs/<run_id>/jobs/avatar-from-assets \
   -H "Content-Type: application/json" \
   -d '{"person_image_asset_id":"<asset_id>","audio_asset_id":"<asset_id>"}'
 ```
@@ -260,6 +267,8 @@ curl -X POST http://localhost:8080/api/runs/<run_id>/jobs/avatar-from-assets \
 
 注意：compose 的 `environment:` 插值中，**shell 环境变量优先于 `.env` 文件** —— 改了 `.env` 之后如果容器没生效，先 `unset` 残留变量再 `docker compose up -d --force-recreate`。详见 `docs/DEPLOYMENT.md` §2。
 
+供应商密钥不必只放在 `.env`：打开 `http://localhost:18080/settings`（仪表盘工具栏的「供应商密钥」）即可新增、轮换、停用、做可用性检查。库内凭据**优先于**环境变量，api 与 worker 都是按请求/按轮次重建，所以**保存即生效，不用重启**。对应的 JSON 接口是 `POST /api/provider-credentials` 系列（需要 `provider:manage`）。
+
 ## Planner 与供应商
 
 Planner 默认本地确定性 JSON 生成（不花钱、结果可复现）。切到 DashScope：
@@ -281,7 +290,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 ### 升级前预检（读数据库与配置本身，exit 0/1/2，支持 --json）
 python scripts/deployment_preflight.py
 
-### 部署后冒烟：纯 HTTP 走一遍审核内核与全部版本化能力面（默认 390 项检查）
+### 部署后冒烟：纯 HTTP 走一遍审核内核与全部版本化能力面（默认 408 项检查）
 docker compose exec -T api python scripts/verify_review_loop.py
 
 ### 部署姿态自报：版本、迁移位点、能力开关、表数、维护开关
@@ -308,7 +317,7 @@ apps/api/         FastAPI 应用（路由、中间件、领域逻辑）
 apps/worker/      后台作业 Worker（队列消费、provider 轮询、FFmpeg）
 apps/web/         内置 Web 工作台（无前端构建步骤的 FastAPI 页面）
 packages/         provider 适配器、权限、工具契约等领域包
-pipelines/        流水线 DSL 定义（7 条）
+pipelines/        流水线 DSL 定义（10 条）
 tool_catalog/     运行时工具目录（26 个工具）
 sdk/python/       Python SDK（零依赖）+ s2v CLI
 sdk/typescript/   TypeScript SDK
@@ -328,7 +337,9 @@ tests/            812 项 pytest
 | `docs/API_STABILITY.md` | 版本兼容策略：稳定面 / 实验面 / 不承诺面 |
 | `docs/DEPLOYMENT.md` | 12 节部署 runbook：升级、回滚、备份恢复、密钥轮换 |
 | `docs/DECISIONS.md` | 架构决策记录（ADR） |
-| `CHANGELOG.md` | 版本历史 |
+| `CHANGELOG.md` | 版本历史（逐条变更） |
+| `docs/VERSIONS.md` | 发布版本说明：各版本的变更内容、升级步骤与已知限制 |
+| `docs/CAPABILITY_GAP_PLAN.md` | 能力补齐计划：还缺什么、按什么顺序补、每批怎么验收 |
 | `docs/FULL_VERSION_ROADMAP.md` | 各版本验收说明 |
 | `README.en.md` | 英文版 README（更长的端点级说明） |
 
@@ -343,7 +354,13 @@ tests/            812 项 pytest
 
 ## 版本与许可
 
-当前版本 **1.1.0**（冻结承诺生效，见 `docs/API_STABILITY.md`）。数据库 36 张表，迁移 head `20261012_0022`。
+发布版本 **1.0.1**（2026-11-09），服务端 API 版本 **1.1.0**（兼容策略见 `docs/API_STABILITY.md`）。
+本版内容：供应商密钥的网页维护（`/settings`）、三条素材剪辑流水线
+（`talking_head` / `podcast_repurpose` / `cinematic`）、决策审计日志
+（`GET /api/runs/{run_id}/decision-log`）。
+各版本的变更内容、升级步骤与已知限制见 [`docs/VERSIONS.md`](docs/VERSIONS.md)。
+
+数据库 37 张表，迁移 head `20261109_0023`。
 
 以 [Apache License 2.0](LICENSE) 发布。
 

@@ -35,6 +35,10 @@ PAGE_ROUTES = frozenset(
         "/run-board",
         "/asset-library",
         "/team",
+        # Operator settings: provider credential maintenance in the browser.
+        # Same reasoning as the rest of the pages — it serves HTML, so it is not
+        # part of the JSON contract the permission tables describe.
+        "/settings",
         # V7.4: the embed shell. The integration id sits in the path because the
         # first document request carries no credential at all — without it the
         # server could not compute ``frame-ancestors`` for the response.
@@ -107,8 +111,9 @@ def test_the_documented_operation_set_is_pinned():
     # V8.5 added the four /api/deployment operations (117 -> 120 paths,
     # 148 -> 152 operations). V1.1 added the three /api/auth operations and the
     # user password endpoint (120 -> 124 paths, 152 -> 156 operations).
-    assert len(spec["paths"]) == 124
-    assert len(operations) == 156
+    # P2 added the run decision log (124 -> 125 paths, 156 -> 157 operations).
+    assert len(spec["paths"]) == 125
+    assert len(operations) == 157
     assert CRITICAL_OPERATIONS <= operations
 
 

@@ -92,6 +92,11 @@ POLICY: dict[tuple[str, str], tuple[Permission, str]] = {
     ("GET", "/api/runs/{run_id}/usage"): (Permission.RUN_READ, SCOPE_RUN),
     ("GET", "/api/runs/{run_id}/usage/ledger"): (Permission.RUN_READ, SCOPE_RUN),
     ("GET", "/api/runs/{run_id}/tool-invocations"): (Permission.RUN_READ, SCOPE_RUN),
+    # P2: the reasoning behind the choices is part of the run's record, so it
+    # rides on the same read permission as the run itself. It is tenant-scoped
+    # like every other ``/runs/{run_id}`` read: the guard runs before the
+    # handler, so a cross-tenant id is a 404 rather than an empty list.
+    ("GET", "/api/runs/{run_id}/decision-log"): (Permission.RUN_READ, SCOPE_RUN),
     ("GET", "/api/runs/{run_id}/review-requests"): (Permission.RUN_READ, SCOPE_RUN),
     ("GET", "/api/runs/{run_id}/dispatch-stage-execution/preview"): (
         Permission.RUN_READ,

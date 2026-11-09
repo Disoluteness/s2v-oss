@@ -22,7 +22,7 @@ Not for: an out-of-the-box desktop video editor — this is a server-side platfo
 ## Core Features
 
 **Pipelines and artifacts**
-- 7 pipelines: the formal `avatar_spokesperson` (digital-human spokesperson: brand ads, knowledge narration, product introductions), the compatibility key `spokesperson_ad`, and 5 betas: `animated_explainer`, `source_clip_factory`, `screen_demo`, `hybrid_story`, `localization_dub`
+- 10 pipelines: the formal `avatar_spokesperson` (digital-human spokesperson: brand ads, knowledge narration, product introductions), the compatibility key `spokesperson_ad` (draft), and 8 betas: `animated_explainer`, `source_clip_factory`, `screen_demo`, `hybrid_story`, `localization_dub`, plus three footage-cutting lines — `talking_head` (on-camera footage), `podcast_repurpose` (long audio), `cinematic` (mood-led cuts and trailers)
 - Pipeline DSL v1: the pipeline definition is snapshotted onto each run, so later file edits never change historical runs
 - Artifact Schema Registry: `production_plan`, `spoken_script`, `shot_list`, `preflight_report`, `execution_plan`, `composition_graph` and friends are validated on write and carry `producer` / `lineage` / `derived_from` lineage
 - Run state machine: `pause` / `resume` / `cancel` / `rerun_stage` / `rerun_artifact` / `skip_optional_stage`; reruns may be issued from `completed`, and downstream passed gates reopen with an incremented round
@@ -39,7 +39,7 @@ Not for: an out-of-the-box desktop video editor — this is a server-side platfo
 
 **API contract**
 - One failure envelope `{"detail": {"code", "message", ...}}`, stable branchable error codes, discoverable via `GET /api/error-codes`
-- `Idempotency-Key` replay (same key with a different body is a 409), `Page` pagination envelope, OpenAPI document with 124 paths / 156 operations
+- `Idempotency-Key` replay (same key with a different body is a 409), `Page` pagination envelope, OpenAPI document with 125 paths / 157 operations
 - Version frozen at 1.1.0; the compatibility policy separates stable / experimental / not-promised surfaces (`docs/API_STABILITY.md`)
 
 **Integration surfaces**
@@ -111,7 +111,7 @@ cp .env.example .env
 make api
 ```
 
-Open:
+Open (`make api` listens on `8080`; the compose stack below binds the host to `18080`):
 
 ```text
 http://localhost:8080/api/health
@@ -127,7 +127,7 @@ docker compose up --build
 docker compose exec api alembic upgrade head
 ```
 
-Inside the compose network the API connects to `mysql:3306`; the host gets MySQL on `3307` and the API on `18080` (avoiding common port conflicts), while Redis and MinIO stay internal. The worker processes queued jobs automatically; for one-off debugging:
+Inside the compose network the API connects to `mysql:3306`; the host gets MySQL on `3307` and the API on `18080` (avoiding common port conflicts), while Redis and MinIO stay internal. Every request example below assumes this compose port, `http://localhost:18080`; if you run `make api` directly instead, switch the port back to `8080`. The worker processes queued jobs automatically; for one-off debugging:
 
 ```bash
 docker compose exec worker python -m apps.worker.background_jobs --once
@@ -139,12 +139,12 @@ docker compose exec worker python -m apps.worker.background_jobs --once
 
 ```bash
 ### 1. Create a project
-curl -X POST http://localhost:8080/api/projects \
+curl -X POST http://localhost:18080/api/projects \
   -H "Content-Type: application/json" \
   -d '{"title":"Autumn milk tea ad"}'
 
 ### 2. Create a run under the project
-curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
+curl -X POST http://localhost:18080/api/projects/<project_id>/runs \
   -H "Content-Type: application/json" \
   -d '{
     "pipeline_key":"avatar_spokesperson",
@@ -156,19 +156,19 @@ curl -X POST http://localhost:8080/api/projects/<project_id>/runs \
   }'
 
 ### 3. Preflight → auditable execution plan → start
-curl -X POST http://localhost:8080/api/runs/<run_id>/preflight
-curl -X POST http://localhost:8080/api/runs/<run_id>/execution-plan
-curl -X POST http://localhost:8080/api/runs/<run_id>/start
+curl -X POST http://localhost:18080/api/runs/<run_id>/preflight
+curl -X POST http://localhost:18080/api/runs/<run_id>/execution-plan
+curl -X POST http://localhost:18080/api/runs/<run_id>/start
 
 ### 4. Review loop: when the run parks in waiting_review, find the open gate and approve it
-curl "http://localhost:8080/api/runs/<run_id>/review-requests?status=open"
+curl "http://localhost:18080/api/runs/<run_id>/review-requests?status=open"
 
-curl -X POST http://localhost:8080/api/review-requests/<request_id>/decisions \
+curl -X POST http://localhost:18080/api/review-requests/<request_id>/decisions \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 
 ### Or one-click stage review (equivalent, backed by the same review kernel)
-curl -X POST http://localhost:8080/api/runs/<run_id>/stages/<stage_key>/review \
+curl -X POST http://localhost:18080/api/runs/<run_id>/stages/<stage_key>/review \
   -H "Content-Type: application/json" \
   -d '{"decision":"approve","comment":"OK"}'
 ```
@@ -181,7 +181,7 @@ Two things worth knowing immediately:
 Not ready to wire real providers? The MVP sample endpoint walks the full script-to-MP4 chain with deterministic local FFmpeg media (the default `local_preview` mode):
 
 ```bash
-curl -X POST http://localhost:8080/api/mvp/sample-runs \
+curl -X POST http://localhost:18080/api/mvp/sample-runs \
   -H "Content-Type: application/json" \
   -d '{
     "title":"Autumn milk tea sample",
@@ -203,7 +203,7 @@ pip install ./sdk/python   # provides both `import s2v` and the `s2v` command
 ```python
 from s2v import Script2VideoClient
 
-client = Script2VideoClient(base_url="http://localhost:8080", api_key="s2v_...")
+client = Script2VideoClient(base_url="http://localhost:18080", api_key="s2v_...")
 video = client.script_to_video("秋天第一杯奶茶，还没人给你点？", project_title="Launch")
 print(video.download_url)
 ```
@@ -219,6 +219,13 @@ s2v video download <run_id> -o final.mp4
 
 Exit codes are part of the contract: `0` success, `1` failure, `2` usage, `3` wait timed out, `4` run settled on `failed`.
 
+The CLI must be told the address and the key: `--base-url` / `--api-key` first, then `S2V_BASE_URL` / `S2V_API_KEY`, then the local config file. Write them once (the address is the compose port from Quick Start):
+
+```bash
+s2v config set base-url http://localhost:18080
+s2v config set api-key s2v_...
+```
+
 ## Digital-Human Pipeline Notes
 
 The adapter is `dashscope_avatar_video`, with an async lifecycle: submit → poll → archive as an asset → FFmpeg compose.
@@ -231,7 +238,7 @@ The adapter is `dashscope_avatar_video`, with an async lifecycle: submit → pol
 Submit from existing assets (the platform signs the temporary links):
 
 ```bash
-curl -X POST http://localhost:8080/api/runs/<run_id>/avatar-tasks/from-assets \
+curl -X POST http://localhost:18080/api/runs/<run_id>/avatar-tasks/from-assets \
   -H "Content-Type: application/json" \
   -d '{"person_image_asset_id":"<asset_id>","audio_asset_id":"<asset_id>"}'
 ```
@@ -239,7 +246,7 @@ curl -X POST http://localhost:8080/api/runs/<run_id>/avatar-tasks/from-assets \
 For non-blocking execution, enqueue the same work as a background job (the worker submits, polls, archives, and composes automatically):
 
 ```bash
-curl -X POST http://localhost:8080/api/runs/<run_id>/jobs/avatar-from-assets \
+curl -X POST http://localhost:18080/api/runs/<run_id>/jobs/avatar-from-assets \
   -H "Content-Type: application/json" \
   -d '{"person_image_asset_id":"<asset_id>","audio_asset_id":"<asset_id>"}'
 ```
@@ -262,6 +269,8 @@ The full annotated list is `.env.example`; the ones you will touch first:
 | `EMBED_TOKEN_SECRET` | Optional: embed-token signing key; must be set before onboarding external platforms |
 
 Note on compose: inside `environment:` interpolation, **shell environment variables take precedence over the `.env` file** — if a `.env` change does not reach the container, `unset` the leftover variable and `docker compose up -d --force-recreate`. See `docs/DEPLOYMENT.md` §2.
+
+Provider keys do not have to live in `.env` only: open `http://localhost:18080/settings` (the "供应商密钥" button in the dashboard toolbar) to create, rotate, disable and check credentials. Stored credentials **outrank** environment variables, and both api and worker rebuild their store per request / per job, so **a save takes effect immediately — no restart**. The underlying JSON API is the `POST /api/provider-credentials` family (requires `provider:manage`).
 
 ## Planner and Providers
 
@@ -286,7 +295,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 python scripts/deployment_preflight.py
 
 ### Post-deploy smoke: pure-HTTP walk of the review kernel and every versioned
-# capability surface (390 checks by default)
+# capability surface (408 checks by default)
 docker compose exec -T api python scripts/verify_review_loop.py
 
 ### Deployment posture self-report: version, migration head, capability switches,
@@ -314,7 +323,7 @@ apps/api/         FastAPI application (routes, middleware, domain logic)
 apps/worker/      Background-job worker (queue consumption, provider polling, FFmpeg)
 apps/web/         Built-in web workspace (FastAPI pages, no frontend build step)
 packages/         Domain packages: provider adapters, permissions, tool contracts
-pipelines/        Pipeline DSL definitions (7)
+pipelines/        Pipeline DSL definitions (10)
 tool_catalog/     Runtime tool catalog (26 tools)
 sdk/python/       Python SDK (zero-dependency) + the s2v CLI
 sdk/typescript/   TypeScript SDK
@@ -334,7 +343,9 @@ tests/            812 pytest tests
 | `docs/API_STABILITY.md` | Version compatibility policy: stable / experimental / not-promised surfaces |
 | `docs/DEPLOYMENT.md` | 12-section deployment runbook: upgrades, rollback, backup/restore, key rotation |
 | `docs/DECISIONS.md` | Architecture decision records (ADRs) |
-| `CHANGELOG.md` | Version history |
+| `CHANGELOG.md` | Version history (entry by entry) |
+| `docs/VERSIONS.md` | Release notes: per-version changes, upgrade steps and known limitations (Chinese) |
+| `docs/CAPABILITY_GAP_PLAN.md` | Capability plan: what is still missing, in what order it gets built, how each batch is accepted |
 | `docs/FULL_VERSION_ROADMAP.md` | Per-version acceptance notes |
 | `README.md` | Chinese README |
 
@@ -349,7 +360,13 @@ tests/            812 pytest tests
 
 ## Version and License
 
-Current version **1.1.0** (the frozen-version promise is in force, see `docs/API_STABILITY.md`). The database has 36 tables at migration head `20261012_0022`.
+Release version **1.0.1** (2026-11-09), server API version **1.1.0** (compatibility policy: `docs/API_STABILITY.md`).
+This release ships: provider-credential maintenance in the browser (`/settings`), three footage-cutting
+pipelines (`talking_head` / `podcast_repurpose` / `cinematic`), and a decision audit log
+(`GET /api/runs/{run_id}/decision-log`).
+Per-version changes, upgrade steps and known limitations are in [`docs/VERSIONS.md`](docs/VERSIONS.md) (Chinese).
+
+The database has 37 tables at migration head `20261109_0023`.
 
 Released under the [Apache License 2.0](LICENSE).
 

@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from apps.api.app import db_models, routes  # noqa: F401
+from apps.api.app.actor import ActorContext
 from apps.api.app.db import Base
 from apps.api.app.db_store import DatabaseStore
 from apps.api.app.main import app
@@ -29,6 +30,15 @@ from packages.tool_kit.registry import ToolRegistry
 from packages.tool_kit.selector import select_tool_for_capability
 
 WEB_ROOT = Path(__file__).resolve().parents[1] / "apps" / "web"
+
+#: Route functions take the resolved actor as a parameter (FastAPI injects it in
+#: the app, tests pass it directly). The decision log records who acknowledged a
+#: downgrade, so the call sites need a concrete identity rather than ``None``.
+ACTOR = ActorContext(
+    actor_id="user_test_owner",
+    tenant_id="tenant_default",
+    display_name="Test Owner",
+)
 
 
 def _api_tool(
@@ -301,7 +311,7 @@ def test_start_endpoint_returns_the_structured_refusal(tmp_path) -> None:
     store, run = _store_with_run(tmp_path, "provider_avatar", name="api-blocked.db")
 
     with pytest.raises(HTTPException) as exc_info:
-        start_run_route(run.run_id, store, StartRunRequest())
+        start_run_route(run.run_id, store, ACTOR, StartRunRequest())
 
     assert exc_info.value.status_code == 400
     detail = exc_info.value.detail
@@ -313,7 +323,9 @@ def test_start_endpoint_returns_the_structured_refusal(tmp_path) -> None:
 def test_start_endpoint_accepts_an_acknowledgement(tmp_path) -> None:
     store, run = _store_with_run(tmp_path, "provider_avatar", name="api-accepted.db")
 
-    result = start_run_route(run.run_id, store, StartRunRequest(accept_intent_downgrade=True))
+    result = start_run_route(
+        run.run_id, store, ACTOR, StartRunRequest(accept_intent_downgrade=True)
+    )
 
     assert result["status"] != RunStatus.DRAFT.value
 

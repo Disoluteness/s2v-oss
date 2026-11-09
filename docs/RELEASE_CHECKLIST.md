@@ -12,12 +12,12 @@
 
 | 项 | 命令 | 1.1.0 基线 |
 |---|---|---|
-| 单元 / 契约测试 | `find /tmp/pt_release -mindepth 1 -delete; .venv/bin/python -m pytest -q --basetemp=/tmp/pt_release` | **805 passed, 1 skipped** |
+| 单元 / 契约测试 | `find /tmp/pt_release -mindepth 1 -delete; .venv/bin/python -m pytest -q --basetemp=/tmp/pt_release` | **832 passed, 1 skipped**（`test_embeddable_workspace` 的 3 个分帧测试要求 `starlette<1.0`：1.x 改了 `BaseHTTPMiddleware` 的 `receive` 语义，会报 `Unexpected message received: http.request`） |
 | 静态检查 | `.venv/bin/python -m ruff check apps tests scripts` | All checks passed |
-| 部署门禁（默认配置） | `docker compose exec -T api python scripts/verify_review_loop.py` | **390 项，失败 0** |
-| 部署门禁（可选配置全开） | 同上，另设 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` | **394 项，失败 0** |
+| 部署门禁（默认配置） | `docker compose exec -T api python scripts/verify_review_loop.py` | **408 项，失败 0** |
+| 部署门禁（可选配置全开） | 同上，另设 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` | **412 项，失败 0** |
 | 页面内联脚本 | `node --check`（7 个页面） | 全部通过 |
-| 迁移往返 | `alembic upgrade head` → `downgrade -1` → `upgrade head` | 36 → 35 → 36 张表（V1.1 T96 起，head `20261012_0022`） |
+| 迁移往返 | `alembic upgrade head` → `downgrade -1` → `upgrade head` | 37 → 36 → 37 张表（P2 起，head `20261109_0023`） |
 | 预检 | `python scripts/deployment_preflight.py` | 失败 0 |
 
 **门禁可重入**：同一个库连跑两次必须都全绿。每次都直接在部署机上重跑即可，不需要先清库。
@@ -27,8 +27,8 @@
 **允许的偏差**（不是回归）：
 
 - 部署机配了真实 provider key 时，第 11 节有 3 条「意图降级」检查按设计跳过 —— 总项数少 3。
-- 可选配置分支：默认配置 390 项，`SECRET_ENCRYPTION_KEY` + `PROVIDER_CALLBACK_SECRET`
-  全开时 394 项（第 23 节由 14 项变 18 项）。两种配置**各自**连跑两次都要绿，不能只测一种。
+- 可选配置分支：默认配置 408 项，`SECRET_ENCRYPTION_KEY` + `PROVIDER_CALLBACK_SECRET`
+  全开时 412 项（第 23 节由 14 项变 18 项）。两种配置**各自**连跑两次都要绿，不能只测一种。
 
 ## 2. V1.0 达标判据
 
@@ -41,7 +41,7 @@
 | 系统自动完成 preflight → execution plan → proposal → 生成 → 合成 → QA → 发布包 | ✅ | 五条 pipeline 的 stage 序列（`pipelines/*.json`）；门禁第 1–10 节走完到第一道人工关口 |
 | 任何失败都能在 Web Studio 看到原因与修复动作 | ✅ | `GET /api/runs/{id}/board` 的 `input_issues` / `repair_actions`；门禁第 14 节；`/run-board` 页面 |
 | 管理员能看到 provider key 状态、用量、成本、失败率 | ✅ | `POST /api/provider-credentials/{id}/check`；`GET /api/projects/{id}/observability`（V8.2）；`/team` 页 |
-| 至少 4 类 pipeline 稳定可用 | ✅ | V1.0 时 5 条在册，4 条非 draft（`avatar_spokesperson` production；`animated_explainer` / `screen_demo` / `source_clip_factory` beta）；V1.1 T94 补齐 `localization_dub` / `hybrid_story`（均 beta）后 **7 条在册，6 条非 draft**。**注**：`spokesperson_ad`（MVP 那条）仍是 `draft`，见 §5 |
+| 至少 4 类 pipeline 稳定可用 | ✅ | V1.0 时 5 条在册，4 条非 draft（`avatar_spokesperson` production；`animated_explainer` / `screen_demo` / `source_clip_factory` beta）；V1.1 T94 补齐 `localization_dub` / `hybrid_story`（均 beta）后 **7 条在册，6 条非 draft**；P1 补齐 `talking_head` / `podcast_repurpose` / `cinematic` 后 **10 条在册，9 条非 draft**（`docs/CAPABILITY_GAP_PLAN.md`）。**注**：`spokesperson_ad`（MVP 那条）仍是 `draft`，见 §5 |
 | 部署、升级、备份、回滚都有明确文档 | ✅ | `docs/DEPLOYMENT.md` 12 节（含第 12 节「明确不覆盖」） |
 
 路线图 §4 对 V1.0 的另外四条要求：

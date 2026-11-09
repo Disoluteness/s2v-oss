@@ -51,7 +51,7 @@
 | 字段 | 必填 | 默认 | 说明 |
 |---|---|---|---|
 | `raw_script` | ✅ | — | 原始口播稿 |
-| `pipeline_key` | | `avatar_spokesperson` | 也可 `spokesperson_ad` / `animated_explainer` / `hybrid_story`(beta) / `localization_dub` / `screen_demo` / `source_clip_factory` |
+| `pipeline_key` | | `avatar_spokesperson` | 也可 `spokesperson_ad` / `animated_explainer` / `hybrid_story`(beta) / `localization_dub` / `screen_demo` / `source_clip_factory` / `talking_head`(beta) / `podcast_repurpose`(beta) / `cinematic`(beta) |
 | `brand_name` / `product_name` | | `null` | |
 | `target_platform` | | `douyin` | |
 | `target_duration_seconds` | | `15` | |
