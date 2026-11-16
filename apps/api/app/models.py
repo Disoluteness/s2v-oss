@@ -1765,6 +1765,10 @@ class ComposeVideoRequest(BaseModel):
     fps: int | None = Field(default=None, ge=1, le=120)
     crf: int | None = Field(default=None, ge=0, le=51)
     preset: str | None = None
+    # P3: set after reading the pre_render_check verdict. A critical promise
+    # signal (e.g. stills plan claiming motion-heavy output) blocks composition
+    # until the operator re-sends the request with this flag.
+    accept_quality_risk: bool = False
     video_bitrate: str | None = Field(default=None, max_length=32)
     audio_bitrate: str | None = Field(default=None, max_length=32)
     bgm_volume: float | None = Field(default=None, ge=0.0, le=1.0)

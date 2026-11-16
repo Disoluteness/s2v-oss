@@ -12,10 +12,10 @@
 
 | 项 | 命令 | 1.1.0 基线 |
 |---|---|---|
-| 单元 / 契约测试 | `find /tmp/pt_release -mindepth 1 -delete; .venv/bin/python -m pytest -q --basetemp=/tmp/pt_release` | **832 passed, 1 skipped**（`test_embeddable_workspace` 的 3 个分帧测试要求 `starlette<1.0`：1.x 改了 `BaseHTTPMiddleware` 的 `receive` 语义，会报 `Unexpected message received: http.request`） |
+| 单元 / 契约测试 | `find /tmp/pt_release -mindepth 1 -delete; .venv/bin/python -m pytest -q --basetemp=/tmp/pt_release` | **859 passed, 1 skipped**（`test_embeddable_workspace` 的 3 个分帧测试要求 `starlette<1.0`：1.x 改了 `BaseHTTPMiddleware` 的 `receive` 语义，会报 `Unexpected message received: http.request`） |
 | 静态检查 | `.venv/bin/python -m ruff check apps tests scripts` | All checks passed |
-| 部署门禁（默认配置） | `docker compose exec -T api python scripts/verify_review_loop.py` | **408 项，失败 0** |
-| 部署门禁（可选配置全开） | 同上，另设 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` | **412 项，失败 0** |
+| 部署门禁（默认配置） | `docker compose exec -T api python scripts/verify_review_loop.py` | **413 项，失败 0** |
+| 部署门禁（可选配置全开） | 同上，另设 `SECRET_ENCRYPTION_KEY` 与 `PROVIDER_CALLBACK_SECRET` | **417 项，失败 0** |
 | 页面内联脚本 | `node --check`（7 个页面） | 全部通过 |
 | 迁移往返 | `alembic upgrade head` → `downgrade -1` → `upgrade head` | 37 → 36 → 37 张表（P2 起，head `20261109_0023`） |
 | 预检 | `python scripts/deployment_preflight.py` | 失败 0 |
@@ -27,8 +27,8 @@
 **允许的偏差**（不是回归）：
 
 - 部署机配了真实 provider key 时，第 11 节有 3 条「意图降级」检查按设计跳过 —— 总项数少 3。
-- 可选配置分支：默认配置 408 项，`SECRET_ENCRYPTION_KEY` + `PROVIDER_CALLBACK_SECRET`
-  全开时 412 项（第 23 节由 14 项变 18 项）。两种配置**各自**连跑两次都要绿，不能只测一种。
+- 可选配置分支：默认配置 413 项，`SECRET_ENCRYPTION_KEY` + `PROVIDER_CALLBACK_SECRET`
+  全开时 417 项（第 23 节由 14 项变 18 项）。两种配置**各自**连跑两次都要绿，不能只测一种。
 
 ## 2. V1.0 达标判据
 

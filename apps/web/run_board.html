@@ -1462,6 +1462,7 @@
         review_decision: "人工审核",
         quality_downgrade: "质量降级确认",
         paid_provider_consent: "付费供应商确认",
+        pre_render_risk: "渲染前承诺",
       };
 
       function decisionCategoryLabel(category) {
@@ -1479,6 +1480,7 @@
             "use_tool_below_intent",
             "skip_optional",
             "accept_intent_downgrade",
+            "accept_quality_risk",
           ].includes(decision)
         ) {
           return "warn";
@@ -1500,6 +1502,14 @@
         if (entry.category === "review_decision") {
           const round = chosen.round === null || chosen.round === undefined ? "" : `第 ${chosen.round} 轮`;
           return [`结论 ${chosen.decision || entry.decision}`, round].filter(Boolean).join(" · ");
+        }
+        if (entry.category === "pre_render_risk") {
+          const critical = chosen.critical_count || 0;
+          const detail =
+            critical > 0
+              ? `接受 ${critical} 条冲突信号并渲染（声称 ${chosen.motion_expectation || "未声明"}）`
+              : "无冲突信号，放行渲染";
+          return detail;
         }
         const pairs = Object.entries(chosen)
           .filter(([, value]) => value !== null && value !== undefined && value !== "")
@@ -1562,7 +1572,7 @@
         $("decisionHint").textContent =
           truncation +
           `当前结论 ${rows.length} 条；含重规划的历史共 ${entries.length} 条。` +
-          `写入点：执行计划、人工审核、质量降级确认、付费供应商确认。`;
+          `写入点：执行计划、人工审核、质量降级确认、付费供应商确认、渲染前承诺确认。`;
         if (!rows.length) {
           $("decisionLog").innerHTML = '<div class="empty">该类别暂无决策记录</div>';
           return;

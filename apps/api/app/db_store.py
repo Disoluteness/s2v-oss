@@ -51,6 +51,7 @@ from apps.api.app.db_models import (
 )
 from apps.api.app.decision_log import (
     paid_provider_consent_entry,
+    pre_render_risk_entry,
     quality_downgrade_entry,
     review_decision_entry,
     tool_selection_entries,
@@ -315,6 +316,10 @@ from packages.provider_kit import (
     ElevenLabsMusicAdapter,
 )
 from packages.quality_gate_kit import QualityGateEvaluationRequest, QualityGateRunner
+from packages.quality_gate_kit.pre_render import (
+    PreRenderEvaluationRequest,
+    evaluate_pre_render_promises,
+)
 from packages.render_profile_kit import resolve_render_profile
 from packages.script_screening_kit import ScriptScreeningRoomParser
 from packages.storage_kit import LocalObjectStorage
@@ -6499,11 +6504,24 @@ class DatabaseStore:
         self,
         run_id: str,
         payload: ComposeVideoRequest,
+        *,
+        actor_id: str | None = None,
+        actor_display_name: str | None = None,
     ) -> tuple[ToolInvocation, Asset, Artifact] | None:
         if self.runs.get_run(run_id) is None:
             return None
         if not self.compose_worker.check_availability():
             raise ValueError("ffmpeg and ffprobe are required for video composition")
+        # P3: the promise gate runs before the budget gate on purpose — refusing
+        # a composition the footage cannot support costs nothing, and the check
+        # must not be confused with a billing decision.
+        self._assert_pre_render_promise(
+            run_id,
+            stage_run_id=payload.stage_run_id,
+            accept_quality_risk=payload.accept_quality_risk,
+            actor_id=actor_id,
+            actor_display_name=actor_display_name,
+        )
         self._assert_budget_allows(
             run_id,
             estimated_cost=0.0,
@@ -9627,6 +9645,142 @@ class DatabaseStore:
                 artifact_id=execution_plan_artifact.artifact_id,
             ),
         )
+
+    def _assert_pre_render_promise(
+        self,
+        run_id: str,
+        *,
+        stage_run_id: str | None,
+        accept_quality_risk: bool,
+        actor_id: str | None,
+        actor_display_name: str | None,
+    ) -> None:
+        """P3: refuse to render a plan the footage cannot support.
+
+        Reads the run's existing artifacts (no new model calls), computes the
+        six promise signals, and — when any of them is critical — blocks the
+        composition behind an explicit ``accept_quality_risk`` confirmation.
+        Every evaluated attempt writes a ``pre_render_check`` artifact, so a
+        blocked attempt leaves its evidence behind even though nothing rendered.
+        A run whose artifacts carry no signal at all passes silently: an empty
+        verdict must not fabricate a conflict.
+        """
+
+        shot_list_artifact = self._current_artifact_by_type(run_id, "shot_list")
+        evaluation = evaluate_pre_render_promises(
+            PreRenderEvaluationRequest(
+                shot_list=self._artifact_payload_dict(shot_list_artifact),
+                execution_plan=self._artifact_payload_dict(
+                    self._current_artifact_by_type(run_id, "execution_plan")
+                ),
+                edit_plan=self._artifact_payload_dict(self._current_artifact_by_type(run_id, "edit_plan")),
+                media_analysis=self._artifact_payload_dict(
+                    self._current_artifact_by_type(run_id, "media_analysis_report")
+                ),
+            )
+        )
+        if not evaluation.signals:
+            return
+
+        # The DB row, not the ProductionRun DTO: the decision log needs the
+        # tenant scoping columns the DTO deliberately does not carry.
+        record = self.session.get(ProductionRunRecord, run_id)
+        if record is None:  # pragma: no cover - caller checked moments ago
+            return
+        critical_signals = [signal.model_dump() for signal in evaluation.signals if signal.severity == "critical"]
+
+        if critical_signals and not accept_quality_risk:
+            check_artifact = self.artifacts.append_artifact(
+                run_id=run_id,
+                stage_run_id=stage_run_id,
+                stage_key="compose",
+                artifact_type="pre_render_check",
+                payload=self._pre_render_check_payload(evaluation, status="blocked"),
+            )
+            self.session.commit()
+            self.events.append_event(
+                run_id=run_id,
+                event_type="run.compose_blocked",
+                source_type=EventSourceType.SYSTEM,
+                source_id=check_artifact.artifact_id,
+                stage_run_id=stage_run_id,
+                message="Composition blocked by the pre-render promise check.",
+                payload={
+                    "code": ErrorCode.PRE_RENDER_CHECK_NOT_ACKNOWLEDGED.value,
+                    "critical_count": evaluation.critical_count,
+                    "warning_count": evaluation.warning_count,
+                    "check_artifact_id": check_artifact.artifact_id,
+                },
+            )
+            raise RunGateError(
+                ErrorCode.PRE_RENDER_CHECK_NOT_ACKNOWLEDGED.value,
+                (
+                    "the plan promises motion the footage cannot deliver; review the "
+                    "pre_render_check signals and accept the quality risk to render anyway"
+                ),
+                status_code=409,
+                details={
+                    "check_artifact_id": check_artifact.artifact_id,
+                    "motion_expectation": evaluation.motion_expectation,
+                    "shots_total": evaluation.shots_total,
+                    "critical_count": evaluation.critical_count,
+                    "warning_count": evaluation.warning_count,
+                    "signals": critical_signals,
+                    "resolution": {
+                        "action": "compose_with_acknowledgement",
+                        "body": {"accept_quality_risk": True},
+                    },
+                },
+            )
+
+        if critical_signals:
+            status = "confirmed_with_risk"
+        else:
+            status = "pass"
+        check_artifact = self.artifacts.append_artifact(
+            run_id=run_id,
+            stage_run_id=stage_run_id,
+            stage_key="compose",
+            artifact_type="pre_render_check",
+            payload=self._pre_render_check_payload(evaluation, status=status),
+        )
+        # P2: accepting a contradiction between claim and footage is a human
+        # decision; a clean pass records that the gate was consulted at all.
+        self.decisions.append(
+            run_id=run_id,
+            tenant_id=record.tenant_id,
+            project_id=record.project_id,
+            entry=pre_render_risk_entry(
+                accepted=bool(critical_signals),
+                critical_signals=critical_signals,
+                motion_expectation=evaluation.motion_expectation,
+                shots_total=evaluation.shots_total,
+                check_artifact_id=check_artifact.artifact_id,
+                actor_id=actor_id,
+                actor_display_name=actor_display_name,
+            ),
+        )
+        self.session.commit()
+
+    @staticmethod
+    def _artifact_payload_dict(artifact: Artifact | None) -> dict[str, Any]:
+        if artifact is None or not isinstance(artifact.payload, dict):
+            return {}
+        return dict(artifact.payload)
+
+    @staticmethod
+    def _pre_render_check_payload(evaluation: Any, *, status: str) -> dict[str, Any]:
+        return {
+            "version": "1.0",
+            "status": status,
+            "motion_expectation": evaluation.motion_expectation,
+            "claim_declared": evaluation.claim_declared,
+            "shots_total": evaluation.shots_total,
+            "signals": [signal.model_dump() for signal in evaluation.signals],
+            "critical_count": evaluation.critical_count,
+            "warning_count": evaluation.warning_count,
+            "accepted_quality_risk": status == "confirmed_with_risk",
+        }
 
     def _assert_cost_reservation_allows(
         self,

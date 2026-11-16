@@ -188,7 +188,7 @@ ingest → analysis → clip_selection → edit → export 骨架，但目标与
 | --- | --- |
 | P1 素材剪辑三条产线 | **完成**（2026-11-09）：`talking_head` / `podcast_repurpose` / `cinematic` 均 `beta`，目录 10 条；不新增表 / 迁移 / 工具条目 |
 | P2 决策审计日志 | **完成**（2026-11-09）：新表 `run_decisions` + migration `20261109_0023`（37 张表）+ `GET /api/runs/{run_id}/decision-log` + 四个写入点 + run-board 面板；OpenAPI 125 / 157，门禁新增第 26 节 |
-| P3 渲染前承诺校验 | 待开始 |
+| P3 渲染前承诺校验 | **完成**（2026-11-10）：`pre_render_check.v1` + 六信号 + 409 闸门（`pre_render_check_not_acknowledged`，错误码 29）+ `accept_quality_risk` 确认 + 决策日志 `pre_render_risk` 类别 + run-board 提示；无表 / 无迁移 / 无工具条目 |
 | P4 选择器可解释化 | 待开始 |
 | P5 增强类工具 | 待开始 |
 | P6 素材检索 + 纪录片蒙太奇 | 待开始 |

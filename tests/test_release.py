@@ -127,8 +127,8 @@ def test_release_checklist_and_plan_exist() -> None:
 
 def test_error_catalogue_is_complete() -> None:
     catalog = error_catalog_table()
-    assert len(ErrorCode) == 28
-    assert len(catalog) == 28
+    assert len(ErrorCode) == 29
+    assert len(catalog) == 29
     assert {entry["code"] for entry in catalog} == {code.value for code in ErrorCode}
     for entry in catalog:
         assert isinstance(entry["status_code"], int) and 400 <= entry["status_code"] < 600

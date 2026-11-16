@@ -1912,9 +1912,19 @@ def compose_video(
     run_id: str,
     payload: ComposeVideoRequest,
     store: StoreDep,
+    actor: ActorDep,
 ) -> dict:
     try:
-        result = store.compose_video(run_id, payload)
+        result = store.compose_video(
+            run_id,
+            payload,
+            actor_id=actor.actor_id,
+            actor_display_name=actor.display_name,
+        )
+    except RunGateError as exc:
+        # P3: a blocked composition is a 409 with the signals attached, not a
+        # generic 400 — the board needs the evidence to render the confirm step.
+        raise _run_gate_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:

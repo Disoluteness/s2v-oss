@@ -65,6 +65,7 @@ class ErrorCode(StrEnum):
     COST_RESERVATION_EXCEEDS_BUDGET = "cost_reservation_exceeds_budget"
     TEAM_QUOTA_EXCEEDED = "team_quota_exceeded"
     PAID_PROVIDER_CONFIRMATION_REQUIRED = "paid_provider_confirmation_required"
+    PRE_RENDER_CHECK_NOT_ACKNOWLEDGED = "pre_render_check_not_acknowledged"
     REVIEW_GATE = "review_gate"
     # --- server ------------------------------------------------------------
     INTERNAL_ERROR = "internal_error"
@@ -98,6 +99,10 @@ _DESCRIPTIONS: dict[ErrorCode, str] = {
     ErrorCode.COST_RESERVATION_EXCEEDS_BUDGET: "整轮成本预留超出预算（T76 闸门）",
     ErrorCode.TEAM_QUOTA_EXCEEDED: "本次调用将使团队在该周期内超出配额（V8.3 闸门）",
     ErrorCode.PAID_PROVIDER_CONFIRMATION_REQUIRED: "首次调用付费 provider 需要人工确认（T76 闸门）",
+    ErrorCode.PRE_RENDER_CHECK_NOT_ACKNOWLEDGED: (
+        "渲染前承诺校验发现计划与素材矛盾（如静态图为主却声称运动画面），"
+        "需显式接受质量风险后才能合成（P3 闸门）"
+    ),
     ErrorCode.REVIEW_GATE: "审核门禁规则阻止了该操作",
     ErrorCode.INTERNAL_ERROR: "服务内部错误",
     ErrorCode.BAD_GATEWAY: "上游 provider 或外部依赖返回异常",
@@ -133,6 +138,7 @@ _CATEGORIES: dict[ErrorCode, ErrorCategory] = {
     ErrorCode.COST_RESERVATION_EXCEEDS_BUDGET: ErrorCategory.GATE,
     ErrorCode.TEAM_QUOTA_EXCEEDED: ErrorCategory.GATE,
     ErrorCode.PAID_PROVIDER_CONFIRMATION_REQUIRED: ErrorCategory.GATE,
+    ErrorCode.PRE_RENDER_CHECK_NOT_ACKNOWLEDGED: ErrorCategory.GATE,
     ErrorCode.REVIEW_GATE: ErrorCategory.GATE,
     ErrorCode.INTERNAL_ERROR: ErrorCategory.SERVER,
     ErrorCode.BAD_GATEWAY: ErrorCategory.SERVER,
@@ -164,6 +170,7 @@ _STATUS_CODES: dict[ErrorCode, int] = {
     ErrorCode.COST_RESERVATION_EXCEEDS_BUDGET: 400,
     ErrorCode.TEAM_QUOTA_EXCEEDED: 400,
     ErrorCode.PAID_PROVIDER_CONFIRMATION_REQUIRED: 400,
+    ErrorCode.PRE_RENDER_CHECK_NOT_ACKNOWLEDGED: 409,
     ErrorCode.REVIEW_GATE: 409,
     ErrorCode.INTERNAL_ERROR: 500,
     ErrorCode.BAD_GATEWAY: 502,

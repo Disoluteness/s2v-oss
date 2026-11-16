@@ -251,6 +251,37 @@ class MediaAnalysisReportPayload(ArtifactPayloadModel):
     analysis_notes: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class PreRenderSignalPayload(ArtifactPayloadModel):
+    """One computed promise signal (P3). ``observed`` / ``threshold`` keep the
+    numbers next to the verdict so a reviewer can audit it without re-deriving."""
+
+    signal_key: str
+    severity: str  # critical | warning
+    observed: dict[str, Any] = Field(default_factory=dict)
+    threshold: dict[str, Any] = Field(default_factory=dict)
+    message: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class PreRenderCheckPayload(ArtifactPayloadModel):
+    """The rendered verdict of the pre-render promise gate (P3).
+
+    Written once per composition attempt: ``status`` is ``blocked`` when the
+    attempt was refused, ``confirmed_with_risk`` when a human accepted the
+    critical signals, and ``pass`` when nothing critical fired.
+    """
+
+    version: str = "1.0"
+    status: str  # pass | confirmed_with_risk | blocked
+    motion_expectation: str = "unspecified"
+    claim_declared: bool = False
+    shots_total: int = 0
+    signals: list[PreRenderSignalPayload] = Field(default_factory=list)
+    critical_count: int = 0
+    warning_count: int = 0
+    accepted_quality_risk: bool = False
+
+
 class VideoAnalysisBriefPayload(ArtifactPayloadModel):
     version: str = "1.0"
     run_id: str
@@ -635,6 +666,16 @@ def _default_schemas() -> list[ArtifactSchemaDefinition]:
             "story_outline.v1",
             StoryOutlinePayload,
             allow_placeholder=True,
+        ),
+        ArtifactSchemaDefinition(
+            "pre_render_check",
+            "1.0",
+            "pre_render_check.v1",
+            PreRenderCheckPayload,
+            # Deliberately not placeholder-permitted: this artifact is the
+            # gate's own verdict. A placeholder here would let a composition
+            # bypass look like a performed check.
+            allow_placeholder=False,
         ),
     ]
 

@@ -3475,7 +3475,7 @@ def verify_release(base_url: str) -> None:
 
     # --- the published catalogues ----------------------------------------
     catalog = call(base_url, "GET", "/api/error-codes")
-    check("错误码目录恰好 28 条", len(catalog) == 28, len(catalog))
+    check("错误码目录恰好 29 条", len(catalog) == 29, len(catalog))
     codes = [entry.get("code") for entry in catalog]
     check("错误码不重复（重复会让客户端的 if 分支有一支永远走不到）", len(set(codes)) == len(codes))
     incomplete = [
@@ -3724,6 +3724,56 @@ def verify_decision_log(base_url: str) -> None:
     )
 
 
+def verify_pre_render_gate(base_url: str) -> None:
+    """P3: the plan's promise is checked against the footage before rendering.
+
+    A deployment-level gate cannot inject a contradictory shot list through the
+    public API (planning artifacts are produced, not posted), so the *blocking*
+    branch is proven by the repository tests; what a live deployment must prove
+    is that the vocabulary and the confirmation knob are published: the new
+    error code exists with conflict semantics, the compose request carries the
+    acknowledgement flag, and the board can name the decision.
+    """
+
+    section("27. 渲染前承诺校验（P3）：计划与素材的矛盾在渲染前拦截")
+    catalog = call(base_url, "GET", "/api/error-codes")
+    entry = next(
+        (item for item in catalog if item.get("code") == "pre_render_check_not_acknowledged"),
+        None,
+    )
+    check("渲染前闸门的错误码已发布到目录", entry is not None, [item.get("code") for item in catalog][:5])
+    check(
+        "拦截语义是 409 冲突 + gate 类别 + 不可自动重试",
+        bool(entry)
+        and entry.get("status_code") == 409
+        and entry.get("category") == "gate"
+        and entry.get("retryable") is False
+        and bool(entry.get("description")),
+        entry,
+    )
+
+    spec = call(base_url, "GET", "/openapi.json")
+    compose_schema = (spec.get("components", {}).get("schemas", {}) or {}).get("ComposeVideoRequest") or {}
+    check(
+        "合成请求暴露 accept_quality_risk 显式确认字段",
+        "accept_quality_risk" in (compose_schema.get("properties") or {}),
+        list((compose_schema.get("properties") or {}).keys())[:8],
+    )
+    check(
+        "accept_quality_risk 默认为假（不确认就不放行）",
+        "accept_quality_risk" not in (compose_schema.get("required") or []),
+        compose_schema.get("required"),
+    )
+
+    status, board_html = call_raw(base_url, "/run-board")
+    check("GET /run-board -> 200（承诺面板所在页）", status == 200, status)
+    check(
+        "run-board 能指认渲染前承诺决策",
+        "pre_render_risk" in board_html and "渲染前承诺" in board_html and "accept_quality_risk" in board_html,
+        None,
+    )
+
+
 def _remaining_seconds(expires_at: str) -> float:
     moment = datetime.fromisoformat(expires_at)
     if moment.tzinfo is None:
@@ -3767,6 +3817,7 @@ def main() -> int:
         verify_deployment(base_url)
         verify_release(base_url)
         verify_decision_log(base_url)
+        verify_pre_render_gate(base_url)
 
         print("\n=== 可直接在浏览器打开的地址 ===")
         print(f"  {base_url}/dashboard                                  （审核收件箱）")

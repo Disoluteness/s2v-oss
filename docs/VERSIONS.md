@@ -4,9 +4,85 @@
 
 > 服务端会另报一个 API 版本（`GET /api/deployment` 的 `app_version`，当前 `1.1.0`），
 > 它描述的是**对外接口的形状**，只在端点、字段、错误码变化时前进。
-> `1.0.1` 把供应商密钥搬上网页、新增三条素材剪辑产线，并新增一个只读端点与一张表；
-> 既有字段与错误码一字未动——按 `docs/API_STABILITY.md` 的分类，纯增量端点属于
-> 「无需通知」的一栏，因此 API 版本仍是 `1.1.0`。
+> `1.0.2` 新增一个渲染前闸门、一个错误码与一个请求字段，全部为纯增量——按
+> `docs/API_STABILITY.md` 的分类属于「无需通知」的一栏，因此 API 版本仍是 `1.1.0`。
+
+---
+
+## 1.0.2 — 未发布
+
+**渲染前承诺校验：把「带动画的 PPT」挡在渲染前。**
+
+一条 run 的计划可以描述素材永远交付不了的运动——「动感、运镜丰富」的片子如果
+几乎全由静态图拼成，渲染出来就是幻灯片。等人在成片里发现问题，唯一的修复方式
+是重新计划。本版在合成之前把「计划声称的」与「素材能支撑的」对一遍，
+代价只是让人类确认一次。
+
+### 六个信号
+
+全部从 run 已有的产物推导（shot_list / execution_plan / edit_plan / media_analysis），
+不引入新模型、不新增二进制依赖：
+
+| # | 信号 | 判什么 | 最高严重度 |
+| --- | --- | --- | --- |
+| 1 | `static_shot_share` | 静态图镜头占比 vs 声称的运动期望 | critical |
+| 2 | `avg_shot_duration` | 平均镜头时长过长 + 声称运动为主 | critical |
+| 3 | `missing_intent_share` | 镜头没有任何运镜 / 转场说明的比例 | warning |
+| 4 | `text_screen_share` | 字幕 + 标题承载的画面时间占比 | warning |
+| 5 | `duplicate_composition_share` | 相邻镜头复用同一画面的比例 | warning |
+| 6 | `shot_density` | 镜头数 / 目标时长比不足以支撑宣称的节奏 | critical |
+
+阈值随信号写在响应里（`observed` / `threshold`），审核者不需要重新推导结论。
+
+### 闸门行为
+
+- critical 信号存在时，`POST /api/runs/{run_id}/compose` 返回
+  **409 `pre_render_check_not_acknowledged`**，`detail.signals` 携带全部证据；
+- 同一请求带 `accept_quality_risk: true` 重发即放行——确认是人给的，不是重试；
+- warning 永不拦截，只出现在检查产物里；
+- 每次尝试都落一份 `pre_render_check` 产物：`blocked`（被拦）、
+  `confirmed_with_risk`（接受风险后渲染）、`pass`（无 critical）。被拦的尝试也留证据；
+- 确认接受风险写进决策日志（类别 `pre_render_risk`，与既有四类并列；
+  人工裁决的置信度保持为空，与 P2 的约定一致）；
+- 后台合成 job 走同一个闸门：被拦时 job 失败、错误码为闸门码、**不自动重试**——
+  重试解决不了需要人的决定。
+
+### 不会误报的约定
+
+产物给不出结论时**不出信号、不拦截**：没有镜头清单、素材类型不可知、计划没有
+声明运动期望，对应信号直接缺席。声称的运动期望必须由计划显式给出
+（execution_plan 的 `motion_expectation`），不从被判断的镜头里反推——
+用被审者自己的话审自己，检查就形同虚设。错误码目录 28 → **29**。
+
+### 未变更项
+
+- 不新增表、不新增迁移、不新增工具目录条目、不改变既有 JSON 字段与错误码。
+- 闸门挂在 `compose_video` 的 ffmpeg 可用性检查之后、预算闸门之前，既有闸门顺序不变。
+
+### 升级
+
+无数据库变更。重建 api 与 worker（两侧都含闸门代码）：
+
+```bash
+docker compose build api worker
+docker compose up -d api worker
+```
+
+升级后确认：
+
+- `GET /api/error-codes` 含 `pre_render_check_not_acknowledged`（409 / gate / 不可重试）；
+- `GET /openapi.json` 的 `ComposeVideoRequest` 含 `accept_quality_risk` 字段；
+- 既有 run 的合成行为不变：没有矛盾信号的 run 渲染照旧，无新产物、无新决策记录。
+
+### 已知限制
+
+| 限制 | 说明 |
+| --- | --- |
+| 六个信号依赖产物字段齐全 | 产物缺字段时信号静默缺席（不误报），意味着覆盖随上游产物质量浮动 |
+| 「声称的运动期望」目前只能由计划显式声明 | 上游未声明时，信号 1 / 2 / 6 退化为提示而非拦截 |
+| 阈值是全局常量，不按产线区分 | 纪录片式的长镜头产线需要未来按 pipeline 覆盖阈值 |
+| 部署门禁无法演练 critical 分支 | 公开 API 不能注入矛盾产物，拦截行为由仓库测试证明；部署门禁验证词汇与确认字段已发布 |
+| 重复构图用文本 / 资产引用判等 | 画面级相似（同一素材不同裁切）检测不到 |
 
 ---
 

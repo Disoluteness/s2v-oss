@@ -23,6 +23,7 @@ CATEGORY_TOOL_SELECTION = "tool_selection"
 CATEGORY_REVIEW_DECISION = "review_decision"
 CATEGORY_QUALITY_DOWNGRADE = "quality_downgrade"
 CATEGORY_PAID_PROVIDER_CONSENT = "paid_provider_consent"
+CATEGORY_PRE_RENDER_RISK = "pre_render_risk"
 
 ACTOR_SYSTEM = "system"
 ACTOR_HUMAN = "human"
@@ -193,6 +194,69 @@ def paid_provider_consent_entry(
         "actor_id": actor_id,
         "actor_display_name": actor_display_name,
         "source_artifact_id": None,
+    }
+
+
+def pre_render_risk_entry(
+    *,
+    accepted: bool,
+    critical_signals: list[dict[str, Any]],
+    motion_expectation: str,
+    shots_total: int,
+    check_artifact_id: str | None,
+    actor_id: str | None,
+    actor_display_name: str | None,
+) -> dict[str, Any]:
+    """The operator accepted (or the gate passed without needing) render risks.
+
+    ``accepted=False`` records a clean pass — the check ran and found nothing
+    critical, which is worth a row too: it is evidence the gate was consulted,
+    not skipped. Critical signals land in ``candidates``: each is a promise the
+    footage cannot keep, considered and (when accepted) consciously forgiven.
+    """
+
+    subject = "pre_render_check"
+    if accepted and critical_signals:
+        decision = "accept_quality_risk"
+        rationale = (
+            f"Accepted {len(critical_signals)} critical promise signal(s) "
+            f"(motion expectation: {motion_expectation}, {shots_total} shots) and rendered anyway."
+        )
+    else:
+        decision = "pass"
+        rationale = (
+            f"Pre-render promise check found no critical signals "
+            f"(motion expectation: {motion_expectation}, {shots_total} shots)."
+        )
+    return {
+        "category": CATEGORY_PRE_RENDER_RISK,
+        "subject": subject,
+        "stage_key": "compose",
+        "decision": decision,
+        "chosen": {
+            "accepted": accepted,
+            "motion_expectation": motion_expectation,
+            "shots_total": shots_total,
+            "critical_count": len(critical_signals),
+        },
+        "candidates": [
+            {
+                "signal_key": signal.get("signal_key"),
+                "severity": signal.get("severity"),
+                "observed": signal.get("observed"),
+                "threshold": signal.get("threshold"),
+                "message": signal.get("message"),
+            }
+            for signal in critical_signals
+        ],
+        # A risk acceptance is a human verdict, not a ranking over alternatives.
+        "confidence": None,
+        "confidence_basis": None,
+        "rationale": rationale,
+        "actor_type": ACTOR_HUMAN if accepted else ACTOR_SYSTEM,
+        "actor_id": actor_id,
+        "actor_display_name": actor_display_name,
+        "source_artifact_id": check_artifact_id,
     }
 
 
