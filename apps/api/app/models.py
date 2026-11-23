@@ -414,6 +414,43 @@ class RunCreate(BaseModel):
             "instead of silently falling back to it."
         ),
     )
+    dimension_weights: dict[str, float] | None = Field(
+        default=None,
+        description=(
+            "P4: per-dimension selector weights keyed by task_fit / quality / "
+            "control / reliability / cost / latency / continuity. A weight of 0 "
+            "switches a dimension off (the signal is still computed for audit); "
+            "unknown keys are ignored. Defaults to 1.0 for every dimension."
+        ),
+    )
+    continuity_provider: str | None = Field(
+        default=None,
+        max_length=120,
+        description=(
+            "P4: pin one provider across capabilities (e.g. for visual "
+            "consistency). Tools from this provider get a continuity bonus in "
+            "the selector. Absent means no continuity preference."
+        ),
+    )
+    continuity_providers: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "P4: per-capability continuity mapping (capability -> provider). "
+            "A tool whose provider matches its capability's entry gets a "
+            "smaller continuity bonus than continuity_provider."
+        ),
+    )
+
+    @field_validator("dimension_weights")
+    @classmethod
+    def _dimension_weights_non_negative(cls, value: dict[str, float] | None) -> dict[str, float] | None:
+        """Negative weights would silently invert a dimension's meaning."""
+        if value is None:
+            return None
+        for key, weight in value.items():
+            if weight < 0:
+                raise ValueError(f"dimension_weights[{key}] must be >= 0, got {weight}")
+        return value
 
 
 class StartRunRequest(BaseModel):

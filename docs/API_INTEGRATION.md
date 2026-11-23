@@ -195,6 +195,9 @@ scope：`run:create`（项目级）
 | `style_key` | | `null` | 风格预设 |
 | `cost_budget` | | `null` | 成本上限；声明后预算闸门才开始工作 |
 | `quality_mode` | | `null` | `local_preview` / `provider_audio` / `provider_avatar`。**声明 `provider_avatar` 就是承诺走付费数字人**，环境做不到时会触发意图降级闸门 |
+| `dimension_weights` | | `null` | P4：按维度调选择器权重（`task_fit` / `quality` / `control` / `reliability` / `cost` / `latency` / `continuity`），权重 0 关闭该维度（信号仍照算供审计），未知键忽略，负值 422 |
+| `continuity_provider` | | `null` | P4：声明单一供应商贯穿多个能力（如视觉一致性），该供应商的工具在连续性维度 +90 |
+| `continuity_providers` | | `null` | P4：按能力映射供应商（`{"tts": "dashscope"}`），命中 +45；与 `continuity_provider` 叠加 |
 
 `quality_mode` 是这套系统里最容易被忽略的一个字段：它把「我要什么档次的成品」变成一条可校验的声明。
 不声明 = 不承诺 = 任何降级都默许；声明了 `provider_avatar` 而环境只能降级，`start` 会**拒绝**

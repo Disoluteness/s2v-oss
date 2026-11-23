@@ -6,7 +6,43 @@ from pydantic import BaseModel, Field
 
 from packages.tool_kit.contracts import RuntimeType, ToolDefinition, ToolStatus
 
-SELECTOR_VERSION = "1.0"
+SELECTOR_VERSION = "1.1"
+
+# The seven dimensions every candidate is scored on (P4). The *total* score is
+# the weight-adjusted sum of these; with the default weights (all 1.0) it is
+# bit-for-bit the pre-P4 total, because the old signals were re-grouped without
+# being re-valued: ``availability`` became ``reliability``, the deterministic
+# bonus moved from ``quality`` to ``control``, and the explicit user preference
+# folded into ``task_fit``. ``continuity`` is new and contributes nothing unless
+# the run declares a provider to stay with.
+DIMENSIONS = (
+    "task_fit",
+    "quality",
+    "control",
+    "reliability",
+    "cost",
+    "latency",
+    "continuity",
+)
+
+DIMENSION_LABELS_ZH = {
+    "task_fit": "任务契合",
+    "quality": "输出质量",
+    "control": "控制能力",
+    "reliability": "可靠性",
+    "cost": "成本",
+    "latency": "延迟",
+    "continuity": "连续性",
+}
+
+# Bonus for a tool whose provider matches the run's declared continuity
+# provider. Chosen so that continuity can settle ties between otherwise
+# comparable candidates without overpowering a quality-tier gap.
+CONTINUITY_BONUS = 90.0
+
+# Bonus for a tool that keeps its provider on the capability the run already
+# used it for (mirrored from run_input's provider history when present).
+CONTINUITY_CAPABILITY_BONUS = 45.0
 
 SELECTOR_KEYS = {
     "tts": "tts_selector",
@@ -49,6 +85,39 @@ QUALITY_MODE_CAPABILITIES: dict[str, set[str] | None] = {
 }
 
 
+class SelectorWeights(BaseModel):
+    """Per-dimension weights. A zero weight switches a dimension off entirely.
+
+    Parsed from ``run_input["dimension_weights"]`` when the run declares it;
+    unknown keys are ignored so a typo cannot silently change the selection.
+    """
+
+    task_fit: float = 1.0
+    quality: float = 1.0
+    control: float = 1.0
+    reliability: float = 1.0
+    cost: float = 1.0
+    latency: float = 1.0
+    continuity: float = 1.0
+
+    @classmethod
+    def from_run_input(cls, run_input: dict[str, Any] | None) -> SelectorWeights:
+        declared = (run_input or {}).get("dimension_weights")
+        if not isinstance(declared, dict):
+            return cls()
+        # bool is an int subclass: {"continuity": true} must not read as 1.
+        # Negative values would silently invert a dimension's meaning — the
+        # API rejects them, and here they fall back to the default instead.
+        known = {
+            key: declared[key]
+            for key in DIMENSIONS
+            if isinstance(declared.get(key), (int, float))
+            and not isinstance(declared.get(key), bool)
+            and declared[key] >= 0
+        }
+        return cls(**known)
+
+
 class ToolSelectionCandidate(BaseModel):
     tool_key: str
     provider: str
@@ -58,6 +127,8 @@ class ToolSelectionCandidate(BaseModel):
     rank: int
     eligible: bool
     score_breakdown: dict[str, float] = Field(default_factory=dict)
+    dimension_scores: dict[str, float] = Field(default_factory=dict)
+    strongest_dimension: str | None = None
     selection_role: str = "rejected"
     selection_reason: str | None = None
     fallback_reason: str | None = None
@@ -73,6 +144,7 @@ class ToolSelectionResult(BaseModel):
     selection_reason: str | None = None
     fallback_tool_keys: list[str] = Field(default_factory=list)
     candidates: list[ToolSelectionCandidate] = Field(default_factory=list)
+    dimension_weights: dict[str, float] = Field(default_factory=dict)
     intent: dict[str, Any] | None = None
     intent_satisfied: bool = True
     intent_mismatch_kind: str | None = None
@@ -118,8 +190,9 @@ def select_tool_for_capability(
     run_input = run_input or {}
     intent = capability_intent(capability=capability, run_input=run_input)
     preferences = _selection_preferences(capability=capability, run_input=run_input)
+    weights = SelectorWeights.from_run_input(run_input)
     scored = [
-        _score_candidate(tool=tool, capability=capability, preferences=preferences)
+        _score_candidate(tool=tool, capability=capability, preferences=preferences, weights=weights)
         for tool in tools
     ]
     scored.sort(key=lambda candidate: (-candidate.score, candidate.provider, candidate.tool_key))
@@ -153,6 +226,7 @@ def select_tool_for_capability(
         selection_reason=_selection_reason(selected) if selected else None,
         fallback_tool_keys=fallback_tool_keys,
         candidates=candidates,
+        dimension_weights={dimension: getattr(weights, dimension) for dimension in DIMENSIONS},
         intent=intent,
         intent_satisfied=intent_satisfied,
         intent_mismatch_kind=intent_mismatch_kind,
@@ -242,9 +316,31 @@ def _score_candidate(
     tool: ToolDefinition,
     capability: str,
     preferences: dict[str, Any],
+    weights: SelectorWeights | None = None,
 ) -> ToolSelectionCandidate:
+    weights = weights or SelectorWeights()
     runtime = tool.runtime or tool.runtime_type
-    breakdown = {
+    # Seven explainable dimensions (P4). Re-grouping, not re-valuing: with the
+    # default weights the weighted sum equals the pre-P4 total bit for bit.
+    dimensions = {
+        "task_fit": _task_fit_score(tool, capability, preferences)
+        + _preference_score(tool, preferences),
+        "quality": _quality_tier_score(tool),
+        "control": _control_score(tool),
+        "reliability": _availability_score(tool.status),
+        "cost": _cost_score(tool),
+        "latency": _latency_score(tool),
+        "continuity": _continuity_score(tool, capability, preferences),
+    }
+    score = sum(getattr(weights, key) * value for key, value in dimensions.items())
+    eligible = tool.status in {ToolStatus.AVAILABLE, ToolStatus.DEGRADED}
+    if not eligible:
+        score = min(score, 0.0)
+    strongest = max(dimensions.items(), key=lambda item: item[1])[0]
+    # Legacy breakdown kept verbatim for pre-1.0.3 readers: the six old keys
+    # with their old values, so an existing client comparing breakdowns sees
+    # the same numbers as before.
+    legacy = {
         "availability": _availability_score(tool.status),
         "cost": _cost_score(tool),
         "latency": _latency_score(tool),
@@ -252,10 +348,6 @@ def _score_candidate(
         "preference": _preference_score(tool, preferences),
         "task_fit": _task_fit_score(tool, capability, preferences),
     }
-    score = sum(breakdown.values())
-    eligible = tool.status in {ToolStatus.AVAILABLE, ToolStatus.DEGRADED}
-    if not eligible:
-        score = min(score, 0.0)
     return ToolSelectionCandidate(
         tool_key=tool.tool_key,
         provider=tool.provider,
@@ -264,7 +356,9 @@ def _score_candidate(
         score=round(score, 3),
         rank=0,
         eligible=eligible,
-        score_breakdown={key: round(value, 3) for key, value in breakdown.items()},
+        score_breakdown={key: round(value, 3) for key, value in legacy.items()},
+        dimension_scores={key: round(value, 3) for key, value in dimensions.items()},
+        strongest_dimension=strongest,
     )
 
 
@@ -304,6 +398,8 @@ def _selection_preferences(
         "preferred_tool_keys": _preferred_values(run_input, capability, "tool"),
         "preferred_providers": _preferred_values(run_input, capability, "provider"),
         "quality_mode": run_input.get("quality_mode"),
+        "continuity_provider": run_input.get("continuity_provider"),
+        "continuity_providers": run_input.get("continuity_providers"),
         "context": " ".join(
             str(value)
             for key, value in run_input.items()
@@ -381,6 +477,48 @@ def _quality_score(tool: ToolDefinition) -> float:
     return score
 
 
+def _quality_tier_score(tool: ToolDefinition) -> float:
+    """Quality tier only — the deterministic bonus lives on ``control`` now."""
+
+    tier = tool.quality_profile.tier.lower()
+    return QUALITY_SCORE.get(tier, 70.0)
+
+
+def _control_score(tool: ToolDefinition) -> float:
+    """How much of the outcome the caller can steer.
+
+    A deterministic tool produces the same output for the same input, which is
+    the one control signal every tool declaration already carries. The bonus
+    moved here from ``quality`` in P4 so the two answers stay separate: a tool
+    can be beautiful and unsteerable, or scrappy and fully controllable.
+    """
+
+    return 10.0 if tool.quality_profile.deterministic else 0.0
+
+
+def _continuity_score(
+    tool: ToolDefinition,
+    capability: str,
+    preferences: dict[str, Any],
+) -> float:
+    """Reward staying with a provider the run already committed to.
+
+    Only fires when the run declares it: ``continuity_provider`` pins one
+    provider across capabilities (visual consistency), or
+    ``continuity_providers`` maps capability -> provider. Absent declarations
+    contribute zero, so existing selections are untouched.
+    """
+
+    score = 0.0
+    pinned = preferences.get("continuity_provider")
+    if isinstance(pinned, str) and pinned and tool.provider == pinned:
+        score += CONTINUITY_BONUS
+    per_capability = preferences.get("continuity_providers")
+    if isinstance(per_capability, dict) and per_capability.get(capability) == tool.provider:
+        score += CONTINUITY_CAPABILITY_BONUS
+    return score
+
+
 def _preference_score(tool: ToolDefinition, preferences: dict[str, Any]) -> float:
     score = 0.0
     if tool.tool_key in preferences["preferred_tool_keys"]:
@@ -416,10 +554,12 @@ def _task_fit_score(
 def _selection_reason(candidate: ToolSelectionCandidate | None) -> str | None:
     if candidate is None:
         return None
-    strongest = max(candidate.score_breakdown.items(), key=lambda item: item[1])[0]
+    dimensions = candidate.dimension_scores or candidate.score_breakdown
+    strongest = max(dimensions.items(), key=lambda item: item[1])[0]
+    label = DIMENSION_LABELS_ZH.get(strongest, strongest)
     return (
         f"Selected {candidate.tool_key} with score {candidate.score}; "
-        f"strongest signal: {strongest}."
+        f"strongest dimension: {strongest} ({label})."
     )
 
 

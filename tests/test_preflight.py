@@ -179,7 +179,7 @@ def test_database_store_persists_preflight_report_artifact_and_event(tmp_path) -
     assert artifact.payload["overall_status"] == "degraded"
     assert artifact.payload["pipeline"]["pipeline_key"] == "spokesperson_ad"
     assert any(
-        capability["selector"]["selector_version"] == "1.0"
+        capability["selector"]["selector_version"] == "1.1"
         for capability in artifact.payload["required_capabilities"]
     )
     assert artifacts is not None

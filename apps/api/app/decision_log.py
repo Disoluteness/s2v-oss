@@ -72,6 +72,7 @@ def tool_selection_entries(
                     "required": decision.get("required"),
                     "intent_satisfied": decision.get("intent_satisfied"),
                     "intent_mismatch_kind": decision.get("intent_mismatch_kind"),
+                    "strongest_dimension": selected.get("strongest_dimension"),
                 },
                 "candidates": candidates,
                 "confidence": confidence,
@@ -277,6 +278,10 @@ def _candidate_summary(option: dict[str, Any]) -> dict[str, Any]:
         "rank": option.get("selector_rank"),
         "selection_role": option.get("selection_role"),
         "score_breakdown": option.get("score_breakdown") or {},
+        # P4: the seven explainable dimensions ride along with every recorded
+        # candidate, so the audit answers "why" without reopening the artifact.
+        "dimension_scores": option.get("dimension_scores") or {},
+        "strongest_dimension": option.get("strongest_dimension"),
     }
 
 

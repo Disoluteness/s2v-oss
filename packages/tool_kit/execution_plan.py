@@ -236,6 +236,15 @@ def _capability_decision(
         _tool_option(tool)
         for tool in capability.get("tools", [])
     ]
+    # P4: the weights live on the selection *result* (capability level, in the
+    # preflight's ``selector`` dump), not on each candidate. Propagate them so
+    # an auditor sees the weighting next to the weighted scores, and an option
+    # never carries a misleadingly empty dict.
+    dimension_weights = (capability.get("selector") or {}).get("dimension_weights") or {}
+    if dimension_weights:
+        for option in options_considered:
+            if not option.get("dimension_weights"):
+                option["dimension_weights"] = dimension_weights
     selected_tool = next(
         (
             option
@@ -298,6 +307,11 @@ def _tool_option(tool: dict[str, Any]) -> dict[str, Any]:
         "selection_reason": (tool.get("selection") or {}).get("selection_reason"),
         "fallback_reason": (tool.get("selection") or {}).get("fallback_reason"),
         "score_breakdown": (tool.get("selection") or {}).get("score_breakdown", {}),
+        # P4: the seven explainable dimensions, additive on top of the legacy
+        # six-key score_breakdown (which stays verbatim for existing readers).
+        "dimension_scores": (tool.get("selection") or {}).get("dimension_scores", {}),
+        "strongest_dimension": (tool.get("selection") or {}).get("strongest_dimension"),
+        "dimension_weights": (tool.get("selection") or {}).get("dimension_weights", {}),
     }
 
 

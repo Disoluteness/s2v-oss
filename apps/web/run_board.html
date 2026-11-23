@@ -1491,15 +1491,29 @@
         return "info";
       }
 
+      // P4: the selector names a strongest dimension for every candidate; the
+      // board shows it in Chinese so an auditor reads the reason, not a key.
+      const decisionDimensionLabels = {
+        task_fit: "任务契合",
+        quality: "输出质量",
+        control: "控制能力",
+        reliability: "可靠性",
+        cost: "成本",
+        latency: "延迟",
+        continuity: "连续性",
+      };
+
       function decisionChosenSummary(entry) {
         const chosen = entry.chosen || {};
         if (entry.category === "tool_selection") {
           const tool = chosen.tool_key || "未选择工具";
           const parts = [chosen.provider, chosen.runtime].filter(Boolean).join(", ");
           const score = chosen.score === null || chosen.score === undefined ? "" : ` · 分数 ${chosen.score}`;
-          return parts ? `${tool} (${parts})${score}` : `${tool}${score}`;
-        }
-        if (entry.category === "review_decision") {
+          const dim = chosen.strongest_dimension
+            ? ` · 最强维度 ${decisionDimensionLabels[chosen.strongest_dimension] || chosen.strongest_dimension}`
+            : "";
+          return parts ? `${tool} (${parts})${score}${dim}` : `${tool}${score}${dim}`;
+        }        if (entry.category === "review_decision") {
           const round = chosen.round === null || chosen.round === undefined ? "" : `第 ${chosen.round} 轮`;
           return [`结论 ${chosen.decision || entry.decision}`, round].filter(Boolean).join(" · ");
         }

@@ -3774,6 +3774,111 @@ def verify_pre_render_gate(base_url: str) -> None:
     )
 
 
+def verify_selector_dimensions(base_url: str) -> None:
+    section("28. 工具选择可解释化（P4）：七维打分 / 权重回显 / schema 透传")
+    project = call(
+        base_url,
+        "POST",
+        "/api/projects",
+        {"title": f"选择器维度验证 {datetime.now(UTC):%H:%M:%S}"},
+    )
+    run = call(
+        base_url,
+        "POST",
+        f"/api/projects/{project['project_id']}/runs",
+        {
+            "pipeline_key": "avatar_spokesperson",
+            "raw_script": RAW_SCRIPT,
+            "brand_name": "部署验证品牌",
+            "product_name": "部署验证产品",
+            "dimension_weights": {"cost": 2.0},
+        },
+    )
+    run_id = run["run_id"]
+    call(base_url, "POST", f"/api/runs/{run_id}/preflight")
+    plan = call(base_url, "POST", f"/api/runs/{run_id}/execution-plan")["payload"]
+
+    decisions = [
+        decision
+        for decision in plan.get("decision_log", [])
+        if decision.get("options_considered")
+    ]
+    options = [option for decision in decisions for option in decision["options_considered"]]
+    check(
+        "执行计划有带候选的决策可审计，且每个候选都带七维打分",
+        bool(options)
+        and all(
+            set(option.get("dimension_scores") or {})
+            == {"task_fit", "quality", "control", "reliability", "cost", "latency", "continuity"}
+            and option.get("strongest_dimension")
+            in {"task_fit", "quality", "control", "reliability", "cost", "latency", "continuity"}
+            for option in options
+        ),
+        len(options),
+    )
+    versions = [
+        decision["selector"].get("selector_version")
+        for decision in decisions
+        if decision.get("selector")
+    ]
+    check(
+        "决策的 selector 块把版本钉在 1.1（可解释化升级的标记）",
+        bool(versions) and all(version == "1.1" for version in versions),
+        sorted({version for version in versions if version}),
+    )
+    check(
+        "旧六键 score_breakdown 原样保留（1.0.3 前的读者按旧字段读不会碎）",
+        bool(options)
+        and all(
+            set(option.get("score_breakdown") or {})
+            == {"availability", "cost", "latency", "quality", "preference", "task_fit"}
+            for option in options
+        ),
+        sorted((options[0].get("score_breakdown") or {}).keys()) if options else None,
+    )
+    selector_weights = [
+        decision["selector"].get("dimension_weights") or {}
+        for decision in decisions
+        if decision.get("selector")
+    ]
+    check(
+        "run 输入的自定义权重原样回显（cost=2 进决策与每个候选）",
+        bool(selector_weights)
+        and all(weights.get("cost") == 2.0 for weights in selector_weights)
+        and all(option.get("dimension_weights", {}).get("cost") == 2.0 for option in options),
+        selector_weights[0] if selector_weights else None,
+    )
+    try:
+        call(
+            base_url,
+            "POST",
+            f"/api/projects/{project['project_id']}/runs",
+            {
+                "pipeline_key": "avatar_spokesperson",
+                "raw_script": RAW_SCRIPT,
+                "dimension_weights": {"cost": -1},
+            },
+        )
+        check("负权重被 API 拒绝（422）", False, "奇偶校验：应抛错")
+    except ApiError as exc:
+        check("负权重被 API 拒绝（422）", exc.status == 422, f"HTTP {exc.status} code={exc.code}")
+
+    spec = call(base_url, "GET", "/openapi.json")
+    run_create = (spec.get("components", {}).get("schemas", {}) or {}).get("RunCreate") or {}
+    check(
+        "RunCreate schema 暴露 dimension_weights / continuity_provider / continuity_providers（pydantic 断链的教训）",
+        {"dimension_weights", "continuity_provider", "continuity_providers"}
+        <= set(run_create.get("properties") or {}),
+        sorted((run_create.get("properties") or {}).keys())[:10],
+    )
+    status, board_html = call_raw(base_url, "/run-board")
+    check(
+        "run-board 能用中文指认最强维度",
+        "最强维度" in board_html and "decisionDimensionLabels" in board_html,
+        status,
+    )
+
+
 def _remaining_seconds(expires_at: str) -> float:
     moment = datetime.fromisoformat(expires_at)
     if moment.tzinfo is None:
@@ -3818,6 +3923,7 @@ def main() -> int:
         verify_release(base_url)
         verify_decision_log(base_url)
         verify_pre_render_gate(base_url)
+        verify_selector_dimensions(base_url)
 
         print("\n=== 可直接在浏览器打开的地址 ===")
         print(f"  {base_url}/dashboard                                  （审核收件箱）")

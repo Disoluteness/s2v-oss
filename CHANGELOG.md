@@ -13,6 +13,21 @@
 从 `1.0.0` 起，稳定面的兼容规则由 `docs/API_STABILITY.md` 约束；本文件只记录
 「已经发生的变更」，不预测。
 
+## [Unreleased]
+
+### Added
+
+- **选择器可解释化**（P4，`selector_version` 1.0 → 1.1）：
+  - 打分重组成七个可解释维度：任务契合 / 输出质量 / 控制能力 / 可靠性 / 成本 / 延迟 / 连续性；
+    每条候选新增 `dimension_scores`（七键）、`strongest_dimension`、`dimension_weights`，
+    出现在工具候选、执行计划选项与决策日志候选里。
+  - **重组只分组、不改值**：默认权重下七维加权和与旧六键总分逐位相等，排序与选择结果不变；
+    旧 `score_breakdown` 六键原样保留（兼容承诺）。
+  - `dimension_weights` 可按 run 配置，权重 0 关闭维度（信号仍算出，供审计对照）；未知键忽略。
+  - 新维度 `continuity`：run 声明 `continuity_provider`（+90）或 `continuity_providers`（按能力 +45）
+    即可与已选供应商保持一致；不声明恒为 0。
+  - run-board 决策面板的工具选择摘要显示最强维度（中文）。
+
 ## [1.0.2] - 2026-11-16
 
 ### Added
