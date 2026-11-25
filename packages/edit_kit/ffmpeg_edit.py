@@ -27,6 +27,15 @@ class FfmpegEditRequest(BaseModel):
     preset: str = "veryfast"
     crf: int = Field(default=23, ge=0, le=51)
     audio_bitrate: str = "128k"
+    # P5 enhancement operations. ``grade_preset``/``grade_strength`` drive the
+    # color-grading chain; ``target_loudness_lufs`` drives loudnorm; the pip_*
+    # fields place the second source (source_paths[1]) over the first.
+    grade_preset: str = "neutral"
+    grade_strength: float = Field(default=1.0, ge=0.0, le=1.0)
+    target_loudness_lufs: float = Field(default=-16.0, ge=-40.0, le=-5.0)
+    pip_position: str = "bottom_right"
+    pip_scale: float = Field(default=0.3, ge=0.05, le=0.9)
+    pip_margin: int = Field(default=48, ge=0)
 
 
 class FfmpegEditResult(BaseModel):
@@ -125,6 +134,12 @@ class FfmpegEditWorker:
             return self._concat_command(request)
         if operation in {"trim", "subtitle_burn_in", "auto_reframe", "watermark"}:
             return self._single_input_video_command(request)
+        if operation == "color_grade":
+            return self._color_grade_command(request)
+        if operation == "loudness_normalize":
+            return self._loudness_normalize_command(request)
+        if operation == "picture_in_picture":
+            return self._picture_in_picture_command(request)
         raise ValueError(f"unsupported edit operation: {operation}")
 
     def _single_input_video_command(self, request: FfmpegEditRequest) -> list[str]:
@@ -224,6 +239,104 @@ class FfmpegEditWorker:
         command.extend(["-frames:v", "1", "-q:v", "2", str(request.output_path)])
         return command
 
+    def _color_grade_command(self, request: FfmpegEditRequest) -> list[str]:
+        grade_chain = _grade_filter_chain(request, eq_supported=self.supports_filter("eq"))
+        if not grade_chain:
+            raise ValueError(
+                f"unknown grade preset: {request.grade_preset}; "
+                f"valid presets: {', '.join(sorted(GRADE_PRESETS))}"
+            )
+        command = [
+            self.ffmpeg_path or "ffmpeg",
+            "-y",
+            "-i",
+            str(request.source_paths[0]),
+            "-vf",
+            grade_chain,
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            *(_video_encode_args(request)),
+            "-c:a",
+            "aac",
+            "-b:a",
+            request.audio_bitrate,
+            "-movflags",
+            "+faststart",
+            str(request.output_path),
+        ]
+        return command
+
+    def _loudness_normalize_command(self, request: FfmpegEditRequest) -> list[str]:
+        if not self.supports_filter("loudnorm"):
+            raise RuntimeError("ffmpeg loudnorm filter is required for loudness_normalize")
+        command = [
+            self.ffmpeg_path or "ffmpeg",
+            "-y",
+            "-i",
+            str(request.source_paths[0]),
+            # Video is copied, not re-encoded: loudness is an audio property and
+            # a normalize pass must not cost a video generation.
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0",
+            "-c:v",
+            "copy",
+            "-af",
+            f"loudnorm=I={request.target_loudness_lufs}:TP=-1.5:LRA=11",
+            "-c:a",
+            "aac",
+            "-b:a",
+            request.audio_bitrate,
+            "-movflags",
+            "+faststart",
+            str(request.output_path),
+        ]
+        return command
+
+    def _picture_in_picture_command(self, request: FfmpegEditRequest) -> list[str]:
+        if len(request.source_paths) < 2:
+            raise ValueError(
+                "picture_in_picture requires two source paths: base video first, overlay second"
+            )
+        if not self.supports_filter("overlay") or not self.supports_filter("scale"):
+            raise RuntimeError("ffmpeg overlay and scale filters are required for picture_in_picture")
+        base_path = request.source_paths[0]
+        overlay_path = request.source_paths[1]
+        position = _pip_position(request.pip_position, request.pip_margin)
+        if position is None:
+            raise ValueError(f"unknown pip position: {request.pip_position}")
+        x_expr, y_expr = position
+        filter_complex = (
+            f"[1:v]scale=iw*{request.pip_scale:.4f}:ih*{request.pip_scale:.4f}[pip];"
+            f"[0:v][pip]overlay=x={x_expr}:y={y_expr}[vout]"
+        )
+        command = [
+            self.ffmpeg_path or "ffmpeg",
+            "-y",
+            "-i",
+            str(base_path),
+            "-i",
+            str(overlay_path),
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[vout]",
+            "-map",
+            "0:a?",
+            *(_video_encode_args(request)),
+            "-c:a",
+            "aac",
+            "-b:a",
+            request.audio_bitrate,
+            "-movflags",
+            "+faststart",
+            str(request.output_path),
+        ]
+        return command
+
     def _result(self, request: FfmpegEditRequest, *, command: list[str]) -> FfmpegEditResult:
         if request.operation == "cover_generation":
             width, height = _image_dimensions(self.probe(request.output_path))
@@ -259,6 +372,18 @@ class FfmpegEditWorker:
                 "fps": request.fps,
                 "watermark_text": request.watermark_text,
                 "subtitle_burned": request.operation == "subtitle_burn_in",
+                "grade_preset": request.grade_preset
+                if request.operation == "color_grade"
+                else None,
+                "target_loudness_lufs": request.target_loudness_lufs
+                if request.operation == "loudness_normalize"
+                else None,
+                "pip_position": request.pip_position
+                if request.operation == "picture_in_picture"
+                else None,
+                "pip_scale": request.pip_scale
+                if request.operation == "picture_in_picture"
+                else None,
             },
         )
 
@@ -348,6 +473,59 @@ def _watermark_box_position(position: str) -> tuple[str, str]:
     return positions.get(position, positions["bottom_right"])
 
 
+# P5 color-grade presets. Values are deltas from the neutral baseline (1.0);
+# ``grade_strength`` lerps between neutral and the preset so a subtle grade and
+# a full grade produce different — both deterministic — outputs.
+GRADE_PRESETS: dict[str, dict[str, float]] = {
+    "warm": {"rm": 0.12, "bm": -0.12},
+    "cool": {"rm": -0.12, "bm": 0.12},
+    "high_contrast": {"contrast": 1.25, "saturation": 1.05},
+    "filmic": {"contrast": 1.12, "saturation": 0.9, "gamma": 0.95},
+    "vivid": {"contrast": 1.1, "saturation": 1.3},
+}
+
+
+def _grade_filter_chain(request: FfmpegEditRequest, *, eq_supported: bool) -> str | None:
+    preset = GRADE_PRESETS.get(request.grade_preset)
+    if preset is None:
+        return None
+    if not eq_supported:
+        raise RuntimeError("ffmpeg eq filter is required for color_grade")
+    strength = request.grade_strength
+    filters = []
+    eq_parts = []
+    for key in ("contrast", "saturation", "gamma"):
+        if key in preset:
+            value = 1.0 + (preset[key] - 1.0) * strength
+            eq_parts.append(f"{key}={value:.4f}")
+    if eq_parts:
+        filters.append("eq=" + ":".join(eq_parts))
+    balance_parts = []
+    for key in ("rm", "gm", "bm"):
+        if key in preset:
+            balance_parts.append(f"{key}={preset[key] * strength:.4f}")
+    if balance_parts:
+        filters.append("colorbalance=" + ":".join(balance_parts))
+    return ",".join(filters)
+
+
+def _pip_position(position: str, margin: int) -> tuple[str, str] | None:
+    positions = {
+        "top_left": ("{m}", "{m}"),
+        "top_right": ("main_w-w-{m}", "{m}"),
+        "bottom_left": ("{m}", "main_h-h-{m}"),
+        "bottom_right": ("main_w-w-{m}", "main_h-h-{m}"),
+        "center": ("(main_w-w)/2", "(main_h-h)/2"),
+    }
+    template = positions.get(position)
+    if template is None:
+        return None
+    return (
+        template[0].replace("{m}", str(max(margin, 0))),
+        template[1].replace("{m}", str(max(margin, 0))),
+    )
+
+
 def _video_encode_args(request: FfmpegEditRequest) -> list[str]:
     return [
         "-c:v",
@@ -365,8 +543,15 @@ def _parse_filter_names(output: str) -> set[str]:
     names = set()
     for line in output.splitlines():
         parts = line.split()
-        if len(parts) >= 2 and len(parts[0]) == 3:
-            names.add(parts[1])
+        if len(parts) < 3:
+            continue
+        # Filter lines are "<flags> <name> <in-><out> ...". ffmpeg 9 changed the
+        # flag column to two characters and added a legend block ("T.. = Timeline
+        # support") whose third token carries no arrow — the old "flags are three
+        # characters" rule then matched every legend line and no real filter.
+        if "->" not in parts[2]:
+            continue
+        names.add(parts[1])
     return names
 
 

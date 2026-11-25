@@ -556,6 +556,121 @@
       "install_instructions": "Set KLING_ACCESS_KEY and KLING_SECRET_KEY in the service environment.",
       "best_for": ["cinematic clips", "motion references", "visual B-roll"],
       "fallback_tool_keys": ["dashscope_avatar_video", "local_asset_upload"]
+    },
+    {
+      "tool_key": "ffmpeg_color_grade",
+      "display_name": "FFmpeg Color Grade",
+      "description": "Local color grading through FFmpeg eq and colorbalance filters, with named presets and a strength control.",
+      "capability": "color_grading",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg", "ffprobe"],
+      "best_for": ["brand tone consistency", "look presets", "clip-to-clip visual matching"],
+      "input_contract": {
+        "required": ["operation", "source_asset_id"],
+        "properties": {
+          "operation": "color_grade (via the edit-tools endpoint).",
+          "grade_preset": "warm, cool, high_contrast, filmic, or vivid.",
+          "grade_strength": "0.0 to 1.0; scales how far the preset moves from neutral."
+        }
+      },
+      "output_contract": {
+        "asset_type": "edited_video",
+        "artifact_type": "edit_operation_report",
+        "mime_type": "video/mp4"
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 10,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "production_local",
+        "deterministic": true,
+        "notes": ["Same preset, strength, and source produce the same output."]
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_loudness_normalize",
+      "display_name": "FFmpeg Loudness Normalize",
+      "description": "Local audio loudness normalization to a target LUFS through the FFmpeg loudnorm filter; the video stream is copied, not re-encoded.",
+      "capability": "audio_processing",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg", "ffprobe"],
+      "best_for": ["platform loudness compliance", "consistent clip volume", "podcast and narration normalization"],
+      "input_contract": {
+        "required": ["operation", "source_asset_id"],
+        "properties": {
+          "operation": "loudness_normalize (via the edit-tools endpoint).",
+          "target_loudness_lufs": "Target integrated loudness, -40 to -5 LUFS, default -16."
+        }
+      },
+      "output_contract": {
+        "asset_type": "edited_video",
+        "artifact_type": "edit_operation_report",
+        "mime_type": "video/mp4"
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 5,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "production_local",
+        "deterministic": true,
+        "notes": ["Video stream is copied; only audio is re-encoded."]
+      },
+      "fallback_tool_keys": []
+    },
+    {
+      "tool_key": "ffmpeg_picture_in_picture",
+      "display_name": "FFmpeg Picture-in-Picture",
+      "description": "Local picture-in-picture overlay: scales a second video and composites it onto the base video at a chosen position.",
+      "capability": "video_composition",
+      "provider": "ffmpeg",
+      "runtime_type": "local",
+      "required_binaries": ["ffmpeg", "ffprobe"],
+      "best_for": ["reaction layouts", "host plus demo overlay", "commentary compositing"],
+      "input_contract": {
+        "required": ["operation", "source_asset_ids"],
+        "properties": {
+          "operation": "picture_in_picture (via the edit-tools endpoint).",
+          "source_asset_ids": "Exactly two: base video first, overlay video second.",
+          "pip_position": "top_left, top_right, bottom_left, bottom_right, or center.",
+          "pip_scale": "Overlay width relative to the base, 0.05 to 0.9, default 0.3.",
+          "pip_margin": "Distance from the edge in pixels, default 48."
+        }
+      },
+      "output_contract": {
+        "asset_type": "edited_video",
+        "artifact_type": "edit_operation_report",
+        "mime_type": "video/mp4"
+      },
+      "resource_profile": {
+        "expected_latency_seconds": 15,
+        "network_required": false
+      },
+      "cost_model": {
+        "unit": "operation",
+        "estimated_cost": 0,
+        "currency": "USD"
+      },
+      "quality_profile": {
+        "tier": "production_local",
+        "deterministic": true,
+        "notes": ["Overlay audio is dropped; the base video's audio track is kept."]
+      },
+      "fallback_tool_keys": []
     }
   ]
 }

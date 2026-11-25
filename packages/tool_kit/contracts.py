@@ -179,9 +179,11 @@ def _default_operations_for_capability(capability: str) -> dict[str, bool]:
         operations["archive"] = True
     elif capability in {
         "asset_ingestion",
+        "audio_processing",
         "browser_recording",
         "clip_export",
         "clip_selection",
+        "color_grading",
         "image_generation",
         "interaction_highlight",
         "media_analysis",

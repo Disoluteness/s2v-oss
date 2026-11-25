@@ -3522,6 +3522,18 @@ def verify_release(base_url: str) -> None:
     ]
     check("每条 pipeline 都声明了 stages 与 entrypoint（在册不等于可跑）", not unfinished, unfinished)
 
+    # --- the tool catalogue is pinned too ----------------------------------
+    # P5 filled the enhancement slots the P1 pipelines reserved (color_grading /
+    # audio_processing / picture-in-picture); a dropped tool entry would turn
+    # those optional capabilities into silent "unavailable" rows.
+    tools = call(base_url, "GET", "/api/tools")
+    tool_keys = [entry.get("tool_key") for entry in tools]
+    check(
+        "工具目录恰好 29 个且 tool_key 唯一（P5 三件增强工具在册）",
+        len(tools) == 29 and len(set(tool_keys)) == len(tool_keys),
+        len(tools),
+    )
+
     # --- the catalogues are readable without a credential -----------------
     # "Discoverable without reading our source" is the point of publishing them,
     # so an identity that has no seat at all must still get 200. If this ever

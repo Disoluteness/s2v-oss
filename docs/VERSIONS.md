@@ -10,6 +10,37 @@
 
 ---
 
+## 1.0.4 — 未发布
+
+**增强类工具：调色 / 响度归一 / 画中画，全部本地 FFmpeg 实现。**
+
+P1 的三条素材剪辑产线（`talking_head` / `podcast_repurpose` / `cinematic`）早已把
+`color_grading` 与 `audio_processing` 声明为可选能力，但目录里没有对应工具——预检里
+它们只能显示「不可用」。本版把三件增强工具填进目录，预检立即转绿，且每件都可执行。
+
+### 新增工具（26 → 29）
+
+| 工具 | 能力 | 做什么 |
+| --- | --- | --- |
+| `ffmpeg_color_grade` | `color_grading`（新增能力类） | 五个命名预设（warm / cool / high_contrast / filmic / vivid）+ 强度旋钮，`eq` + `colorbalance` 滤镜链 |
+| `ffmpeg_loudness_normalize` | `audio_processing`（新增能力类） | `loudnorm` 到目标 LUFS（默认 -16），**视频流直接 copy 不重编码** |
+| `ffmpeg_picture_in_picture` | `video_composition`（既有能力） | 第二路视频缩放后 overlay 到底板上，五档位置 + 缩放比 + 边距；保留底板音轨 |
+
+### 执行与审计
+
+三个操作走既有 `POST /api/runs/{id}/edit-tools` 端点（`EditOperation` 枚举新增三个值，
+`EditToolRequest` 新增 `grade_preset` / `grade_strength` / `target_loudness_lufs` /
+`pip_position` / `pip_scale` / `pip_margin` 可选字段）。**调用记录与产物 producer 按
+操作映射到对应的目录工具**——审计日志说「调色是 ffmpeg_color_grade 做的」，
+而不是笼统记在 `ffmpeg_edit_tools` 名下。
+
+### 未变更项
+
+无新表、无迁移、无新端点、无新错误码。既有操作的请求/响应形状一字未动
+（新字段全部可选、缺省即旧行为）。
+
+---
+
 ## 1.0.3 — 未发布
 
 **选择器可解释化：把「为什么是它」写进输出。**
@@ -313,7 +344,7 @@ api 与 worker 一并重建：两侧共用同一份存储层代码，只升一�
 
 ### 包含内容
 
-- **流水线**：7 条（其中两条标记 `beta`），工具目录 26 个工具。
+- **流水线**：7 条（其中两条标记 `beta`），工具目录 29 个工具。
 - **审核关口**：五道人工关口（plan / script / storyboard / asset_review / final_review），
   批准即锁定产物版本，决策只增不改，重跑作废下游旧关口。
 - **对外接口**：124 个路径 / 156 个操作；统一失败信封 `{"detail": {code, message, ...}}`；

@@ -318,7 +318,7 @@ apps/worker/      后台作业 Worker（队列消费、provider 轮询、FFmpeg�
 apps/web/         内置 Web 工作台（无前端构建步骤的 FastAPI 页面）
 packages/         provider 适配器、权限、工具契约等领域包
 pipelines/        流水线 DSL 定义（10 条）
-tool_catalog/     运行时工具目录（26 个工具）
+tool_catalog/     运行时工具目录（29 个工具）
 sdk/python/       Python SDK（零依赖）+ s2v CLI
 sdk/typescript/   TypeScript SDK
 examples/         curl / Python / TypeScript 端到端示例

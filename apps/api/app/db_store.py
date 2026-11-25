@@ -6118,7 +6118,7 @@ class DatabaseStore:
         invocation = self.tool_invocations.create_invocation(
             run_id=run_id,
             stage_run_id=stage_run_id,
-            tool_key="ffmpeg_edit_tools",
+            tool_key=_edit_operation_tool_key(payload.operation),
             provider="ffmpeg",
             request_payload=payload.model_dump(),
             status=ToolInvocationStatus.RUNNING,
@@ -6156,7 +6156,7 @@ class DatabaseStore:
                         stage_run_id=stage_run_id,
                         asset_type=result.asset_type,
                         provider="ffmpeg",
-                        tool_key="ffmpeg_edit_tools",
+                        tool_key=_edit_operation_tool_key(payload.operation),
                         filename=result.output_path.name,
                         content=result.output_path.read_bytes(),
                         mime_type=result.mime_type,
@@ -6196,7 +6196,7 @@ class DatabaseStore:
                 error_code=type(exc).__name__,
                 error_message=str(exc),
                 provider="ffmpeg",
-                tool_key="ffmpeg_edit_tools",
+                tool_key=_edit_operation_tool_key(payload.operation),
                 status=ToolInvocationStatus.FAILED.value,
             )
             self.tool_invocations.update_invocation(
@@ -6238,7 +6238,7 @@ class DatabaseStore:
                 "commands": commands,
                 "warnings": sorted(set(warnings)),
             },
-            producer="ffmpeg_edit_tools",
+            producer=_edit_operation_tool_key(payload.operation),
             lineage={
                 "source": "clean_room_edit_kit",
                 "tool_invocation_id": invocation.invocation_id,
@@ -8787,9 +8787,11 @@ class DatabaseStore:
         return asset
 
     def _edit_source_assets(self, run_id: str, payload: EditToolRequest) -> list[Asset]:
-        if payload.operation == EditOperation.CONCAT:
+        if payload.operation in {EditOperation.CONCAT, EditOperation.PICTURE_IN_PICTURE}:
             if len(payload.source_asset_ids) < 2:
-                raise ValueError("source_asset_ids must include at least two assets for concat")
+                raise ValueError(
+                    "source_asset_ids must include at least two assets for concat and picture_in_picture"
+                )
             assets = [self._asset_for_run(run_id, asset_id) for asset_id in payload.source_asset_ids]
         else:
             source_asset_id = payload.source_asset_id or (
@@ -8871,6 +8873,10 @@ class DatabaseStore:
 
         if payload.operation == EditOperation.WATERMARK and not payload.watermark_text:
             raise ValueError("watermark_text is required for watermark")
+        if payload.operation == EditOperation.PICTURE_IN_PICTURE and len(source_paths) < 2:
+            raise ValueError(
+                "picture_in_picture requires two source asset ids: base video first, overlay second"
+            )
         width, height, fps, profile_key = self._edit_dimensions(
             run=run,
             payload=payload,
@@ -8883,7 +8889,7 @@ class DatabaseStore:
             FfmpegEditRequest(
                 operation=payload.operation.value,
                 source_paths=source_paths
-                if payload.operation == EditOperation.CONCAT
+                if payload.operation in {EditOperation.CONCAT, EditOperation.PICTURE_IN_PICTURE}
                 else [source_paths[0]],
                 output_path=temp_root / filename,
                 subtitle_path=subtitle_path,
@@ -8900,6 +8906,12 @@ class DatabaseStore:
                 preset=payload.preset,
                 crf=payload.crf,
                 audio_bitrate=payload.audio_bitrate,
+                grade_preset=payload.grade_preset,
+                grade_strength=payload.grade_strength,
+                target_loudness_lufs=payload.target_loudness_lufs,
+                pip_position=payload.pip_position,
+                pip_scale=payload.pip_scale,
+                pip_margin=payload.pip_margin,
             )
         )
         result.metadata.update({"render_profile_key": profile_key})
@@ -12026,6 +12038,21 @@ def _default_edit_filename(operation: EditOperation) -> str:
     if operation == EditOperation.COVER_GENERATION:
         return "cover.jpg"
     return f"{operation.value.replace('_', '-')}.mp4"
+
+
+# P5: each enhancement operation is its own catalog tool, so the decision log
+# and invocation record must name the tool that actually ran — an audit that
+# says "ffmpeg_edit_tools did the color grade" would point at a tool entry
+# that does not advertise grading.
+_EDIT_OPERATION_TOOL_KEYS: dict[EditOperation, str] = {
+    EditOperation.COLOR_GRADE: "ffmpeg_color_grade",
+    EditOperation.LOUDNESS_NORMALIZE: "ffmpeg_loudness_normalize",
+    EditOperation.PICTURE_IN_PICTURE: "ffmpeg_picture_in_picture",
+}
+
+
+def _edit_operation_tool_key(operation: EditOperation) -> str:
+    return _EDIT_OPERATION_TOOL_KEYS.get(operation, "ffmpeg_edit_tools")
 
 
 def _dashboard_job_summary(job: BackgroundJobRecord) -> DashboardJobSummary:

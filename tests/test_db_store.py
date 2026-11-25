@@ -3006,6 +3006,90 @@ def test_database_store_runs_edit_tool_and_records_report(tmp_path) -> None:
     assert events[-1].payload["operation"] == "export_versions"
 
 
+def test_database_store_maps_enhancement_operations_to_their_catalog_tools(tmp_path) -> None:
+    """P5: each enhancement operation is its own catalog tool, so the invocation
+    must name the tool that actually ran — an audit that credits ffmpeg_edit_tools
+    for a color grade would point at a tool entry that never advertised grading."""
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'enhance-tools.db'}")
+    Base.metadata.create_all(engine)
+    pipeline = PipelineLoader().get_pipeline("avatar_spokesperson")
+
+    session = Session(engine)
+    store = DatabaseStore(session, edit_worker=FakeEditWorker())
+    store.storage.root = tmp_path / "storage"
+    project = store.create_project(ProjectCreate(title="Enhancement tools run"))
+    run = store.create_run(
+        project_id=project.project_id,
+        payload=RunCreate(raw_script="增强工具测试", target_platform="douyin"),
+        pipeline=pipeline,
+    )
+    base_video = store.upload_asset(
+        run.run_id,
+        AssetUpload(
+            asset_type="rendered_video",
+            filename="base.mp4",
+            content_base64=base64.b64encode(b"base video bytes").decode(),
+            mime_type="video/mp4",
+        ),
+    )
+    overlay_video = store.upload_asset(
+        run.run_id,
+        AssetUpload(
+            asset_type="rendered_video",
+            filename="overlay.mp4",
+            content_base64=base64.b64encode(b"overlay video bytes").decode(),
+            mime_type="video/mp4",
+        ),
+    )
+    assert base_video is not None and overlay_video is not None
+
+    graded = store.run_edit_tool(
+        run.run_id,
+        EditToolRequest(
+            operation=EditOperation.COLOR_GRADE,
+            source_asset_id=base_video.asset_id,
+            grade_preset="warm",
+            grade_strength=0.5,
+        ),
+    )
+    assert graded is not None
+    assert graded[0].tool_key == "ffmpeg_color_grade"
+
+    normalized = store.run_edit_tool(
+        run.run_id,
+        EditToolRequest(
+            operation=EditOperation.LOUDNESS_NORMALIZE,
+            source_asset_id=base_video.asset_id,
+            target_loudness_lufs=-16.0,
+        ),
+    )
+    assert normalized is not None
+    assert normalized[0].tool_key == "ffmpeg_loudness_normalize"
+
+    pip = store.run_edit_tool(
+        run.run_id,
+        EditToolRequest(
+            operation=EditOperation.PICTURE_IN_PICTURE,
+            source_asset_ids=[base_video.asset_id, overlay_video.asset_id],
+            pip_position="bottom_right",
+            pip_scale=0.3,
+        ),
+    )
+    assert pip is not None
+    assert pip[0].tool_key == "ffmpeg_picture_in_picture"
+
+    with pytest.raises(ValueError, match="at least two assets"):
+        store.run_edit_tool(
+            run.run_id,
+            EditToolRequest(
+                operation=EditOperation.PICTURE_IN_PICTURE,
+                source_asset_id=base_video.asset_id,
+            ),
+        )
+    session.close()
+
+
 def test_database_store_builds_composition_graph_from_assets(tmp_path) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'composition-graph.db'}")
     Base.metadata.create_all(engine)

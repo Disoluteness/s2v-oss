@@ -114,6 +114,93 @@ def test_ffmpeg_edit_worker_concats_and_burns_subtitles_when_supported(tmp_path)
     assert burned.metadata["subtitle_burned"] is True
 
 
+def test_ffmpeg_edit_worker_colors_loudness_and_pip(tmp_path) -> None:
+    """P5 enhancement operations: grade, normalize, and overlay all run locally."""
+
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        pytest.skip("ffmpeg and ffprobe are required")
+    if not FfmpegEditWorker().supports_filter("loudnorm"):
+        pytest.skip("ffmpeg loudnorm filter is unavailable")
+
+    base = tmp_path / "base.mp4"
+    overlay = tmp_path / "overlay.mp4"
+    _make_video(base, duration=0.8, color="red")
+    _make_video(overlay, duration=0.8, color="blue")
+    worker = FfmpegEditWorker()
+
+    graded = worker.run(
+        FfmpegEditRequest(
+            operation="color_grade",
+            source_paths=[base],
+            output_path=tmp_path / "graded.mp4",
+            grade_preset="warm",
+            grade_strength=0.6,
+        )
+    )
+    assert graded.output_path.is_file()
+    assert graded.asset_type == "edited_video"
+    assert graded.has_audio is True
+    assert graded.metadata["grade_preset"] == "warm"
+
+    normalized = worker.run(
+        FfmpegEditRequest(
+            operation="loudness_normalize",
+            source_paths=[base],
+            output_path=tmp_path / "normalized.mp4",
+            target_loudness_lufs=-16.0,
+        )
+    )
+    assert normalized.output_path.is_file()
+    assert normalized.has_audio is True
+    assert normalized.metadata["target_loudness_lufs"] == -16.0
+
+    pip = worker.run(
+        FfmpegEditRequest(
+            operation="picture_in_picture",
+            source_paths=[base, overlay],
+            output_path=tmp_path / "pip.mp4",
+            pip_position="bottom_right",
+            pip_scale=0.3,
+            pip_margin=16,
+        )
+    )
+    assert pip.output_path.is_file()
+    assert pip.width == 160
+    assert pip.height == 284
+    assert pip.metadata["pip_position"] == "bottom_right"
+
+
+def test_ffmpeg_edit_worker_rejects_unknown_preset_and_single_source_pip(tmp_path) -> None:
+    """Bad inputs fail with a value error before any ffmpeg invocation."""
+
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        pytest.skip("ffmpeg and ffprobe are required")
+
+    source = tmp_path / "source.mp4"
+    _make_video(source, duration=0.4)
+    worker = FfmpegEditWorker()
+
+    with pytest.raises(ValueError, match="unknown grade preset"):
+        worker.run(
+            FfmpegEditRequest(
+                operation="color_grade",
+                source_paths=[source],
+                output_path=tmp_path / "bad.mp4",
+                grade_preset="nope",
+            )
+        )
+    with pytest.raises(ValueError, match="two source paths"):
+        worker.run(
+            FfmpegEditRequest(
+                operation="picture_in_picture",
+                source_paths=[source],
+                output_path=tmp_path / "pip.mp4",
+            )
+        )
+    assert not (tmp_path / "bad.mp4").exists()
+    assert not (tmp_path / "pip.mp4").exists()
+
+
 def _make_video(path, *, duration: float, color: str = "red") -> None:
     completed = subprocess.run(
         [

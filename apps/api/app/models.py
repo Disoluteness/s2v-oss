@@ -85,6 +85,11 @@ class EditOperation(StrEnum):
     WATERMARK = "watermark"
     COVER_GENERATION = "cover_generation"
     EXPORT_VERSIONS = "export_versions"
+    # P5 enhancement operations: each maps to its own catalog tool
+    # (ffmpeg_color_grade / ffmpeg_loudness_normalize / ffmpeg_picture_in_picture).
+    COLOR_GRADE = "color_grade"
+    LOUDNESS_NORMALIZE = "loudness_normalize"
+    PICTURE_IN_PICTURE = "picture_in_picture"
 
 
 class ProviderCredentialStatus(StrEnum):
@@ -1886,6 +1891,14 @@ class EditToolRequest(BaseModel):
     preset: str = "veryfast"
     crf: int = Field(default=23, ge=0, le=51)
     audio_bitrate: str = Field(default="128k", max_length=32)
+    # P5 enhancement fields: consumed by color_grade / loudness_normalize /
+    # picture_in_picture and ignored by every other operation.
+    grade_preset: str = Field(default="neutral", max_length=32)
+    grade_strength: float = Field(default=1.0, ge=0.0, le=1.0)
+    target_loudness_lufs: float = Field(default=-16.0, ge=-40.0, le=-5.0)
+    pip_position: str = Field(default="bottom_right", max_length=32)
+    pip_scale: float = Field(default=0.3, ge=0.05, le=0.9)
+    pip_margin: int = Field(default=48, ge=0)
     variants: list[EditVariantRequest] = Field(default_factory=list)
     asset_metadata: dict[str, Any] = Field(default_factory=dict)
 

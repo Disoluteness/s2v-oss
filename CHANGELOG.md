@@ -17,6 +17,25 @@
 
 ### Added
 
+- **增强类工具**（P5，工具目录 26 → 29，全部本地 FFmpeg 实现）：
+  - `ffmpeg_color_grade`（新能力类 `color_grading`）：五个命名预设 + 强度旋钮，
+    `eq` + `colorbalance` 滤镜链。
+  - `ffmpeg_loudness_normalize`（新能力类 `audio_processing`）：`loudnorm` 到目标 LUFS
+    （默认 -16），视频流直接 copy 不重编码。
+  - `ffmpeg_picture_in_picture`（挂既有 `video_composition`）：第二路视频缩放后
+    overlay 到底板，五档位置 + 缩放比 + 边距，保留底板音轨。
+  - 三个操作走既有 `edit-tools` 端点：`EditOperation` 新增三个值，
+    `EditToolRequest` 新增六个可选字段；调用记录与产物 producer 按操作映射到
+    对应目录工具（审计可指认到具体工具）。
+  - 修复 `_parse_filter_names` 在 ffmpeg 9 下解析不出任何滤镜的既有缺陷
+    （ffmpeg 9 改了 `-filters` 输出格式，旧规则只解析出图例行）。
+  - 门禁新增工具目录钉值检查（第 25 节 +1 项，总项数 420 → 421 / 424 → 425）。
+  - 无新表、无迁移、无新端点、无新错误码。
+
+## [1.0.3] — 未发布（待部署验证后定日期）
+
+### Added
+
 - **选择器可解释化**（P4，`selector_version` 1.0 → 1.1）：
   - 打分重组成七个可解释维度：任务契合 / 输出质量 / 控制能力 / 可靠性 / 成本 / 延迟 / 连续性；
     每条候选新增 `dimension_scores`（七键）、`strongest_dimension`、`dimension_weights`，

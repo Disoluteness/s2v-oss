@@ -211,13 +211,14 @@ artifact 是阶段之间的结构化合同；媒体文件是 asset，不是 arti
 
 ## 7. Tool Registry 与 Provider 适配层
 
-工具目录位于 `tool_catalog/default.json`，当前登记 26 个工具：
+工具目录位于 `tool_catalog/default.json`，当前登记 29 个工具：
 
 - 规划：`rule_based_planner`、`dashscope_planner`
 - 数字人与音频：`dashscope_avatar_video`、`dashscope_tts`、`dashscope_asr`、`elevenlabs_tts`、`elevenlabs_music`
 - 图像与视频：`dashscope_image`、`kling_video`
 - 本地媒体工具：`ffmpeg_compose`、`ffmpeg_media_probe`、`ffmpeg_subtitle_burn`、`ffmpeg_clip_export`、`ffmpeg_edit_tools`、`local_srt_subtitles`、`local_clip_selector`、`local_mvp_avatar_preview`、`local_transcript_placeholder`
 - 渲染与质量：`html_canvas_renderer`、`quality_gate_runner`
+- 增强类（P5）：`ffmpeg_color_grade`（调色，`color_grading`）、`ffmpeg_loudness_normalize`（响度归一，`audio_processing`）、`ffmpeg_picture_in_picture`（画中画，`video_composition`）
 - 屏幕演示：`playwright_browser_recording`、`local_demo_recording_placeholder`、`local_screen_capture_placeholder`、`local_interaction_highlight_planner`
 - 基础设施：`local_object_storage`、`local_asset_upload`
 

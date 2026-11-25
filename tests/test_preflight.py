@@ -18,6 +18,122 @@ def write_catalog(tmp_path, tools: list[dict]) -> list:
     return [path]
 
 
+def test_pipelines_see_the_p5_enhancement_tools_as_available(tmp_path) -> None:
+    """P1's three footage lines already declare color_grading / audio_processing /
+    video_composition as optional capabilities; P5 fills in the local tools so
+    preflight shows them available instead of silently skipped."""
+
+    catalog_paths = write_catalog(
+        tmp_path,
+        [
+            {
+                "tool_key": "rule_based_planner",
+                "display_name": "Rule-Based Planner",
+                "capability": "llm_generation",
+                "provider": "internal",
+                "runtime_type": "local",
+            },
+            {
+                "tool_key": "local_object_storage",
+                "display_name": "Local Object Storage",
+                "capability": "storage",
+                "provider": "local",
+                "runtime_type": "local",
+            },
+            {
+                "tool_key": "ffmpeg_clip_export",
+                "display_name": "FFmpeg Clip Export",
+                "capability": "clip_export",
+                "provider": "ffmpeg",
+                "runtime_type": "local",
+                "required_binaries": ["ffmpeg"],
+            },
+            {
+                "tool_key": "local_srt_subtitles",
+                "display_name": "Local SRT Subtitle Generator",
+                "capability": "subtitle_generation",
+                "provider": "internal",
+                "runtime_type": "local",
+            },
+            {
+                "tool_key": "ffmpeg_compose",
+                "display_name": "FFmpeg Compose",
+                "capability": "video_composition",
+                "provider": "ffmpeg",
+                "runtime_type": "local",
+                "required_binaries": ["ffmpeg"],
+            },
+            {
+                "tool_key": "ffmpeg_color_grade",
+                "display_name": "FFmpeg Color Grade",
+                "capability": "color_grading",
+                "provider": "ffmpeg",
+                "runtime_type": "local",
+                "required_binaries": ["ffmpeg", "ffprobe"],
+            },
+            {
+                "tool_key": "ffmpeg_loudness_normalize",
+                "display_name": "FFmpeg Loudness Normalize",
+                "capability": "audio_processing",
+                "provider": "ffmpeg",
+                "runtime_type": "local",
+                "required_binaries": ["ffmpeg", "ffprobe"],
+            },
+            {
+                "tool_key": "ffmpeg_picture_in_picture",
+                "display_name": "FFmpeg Picture-in-Picture",
+                "capability": "video_composition",
+                "provider": "ffmpeg",
+                "runtime_type": "local",
+                "required_binaries": ["ffmpeg", "ffprobe"],
+            },
+        ],
+    )
+    registry = ToolRegistry(
+        catalog_paths=catalog_paths,
+        env={},
+        binary_checker=lambda binary: (
+            "/usr/bin/ffmpeg" if binary == "ffmpeg" else "/usr/bin/ffprobe" if binary == "ffprobe" else None
+        ),
+    )
+    pipeline = PipelineLoader().get_pipeline("cinematic")
+
+    report = build_preflight_report(
+        pipeline=pipeline,
+        tools=registry.list_tools(),
+        run_input={"raw_script": "测试脚本"},
+    )
+
+    edit_stage = next(
+        stage for stage in report["stages"] if stage["stage_key"] == "edit"
+    )
+    optional = {
+        capability["capability"]: capability
+        for capability in edit_stage["optional_capabilities"]
+    }
+    assert optional["color_grading"]["status"] == "available"
+    assert optional["color_grading"]["recommended_tool_key"] == "ffmpeg_color_grade"
+
+    analysis_stage = next(
+        stage for stage in report["stages"] if stage["stage_key"] == "analysis"
+    )
+    analysis_optional = {
+        capability["capability"]: capability
+        for capability in analysis_stage["optional_capabilities"]
+    }
+    assert analysis_optional["audio_processing"]["status"] == "available"
+    assert (
+        analysis_optional["audio_processing"]["recommended_tool_key"]
+        == "ffmpeg_loudness_normalize"
+    )
+
+    composition_tools = {
+        tool["tool_key"] for tool in optional["video_composition"]["tools"]
+    }
+    assert "ffmpeg_picture_in_picture" in composition_tools
+    assert optional["video_composition"]["status"] == "available"
+
+
 def test_preflight_report_marks_blocked_required_capabilities(tmp_path) -> None:
     catalog_paths = write_catalog(
         tmp_path,
